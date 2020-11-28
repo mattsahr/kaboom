@@ -1,0 +1,11 @@
+### VS Code
+.vscode
+
+### Node template
+logs
+*.log
+node_modules/
+node_modules
+
+### Local resources
+.DS_Store

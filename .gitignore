@@ -9,3 +9,7 @@ node_modules
 
 ### Local resources
 .DS_Store
+
+### Gallery Data
+gallery-active/
+gallery-static/

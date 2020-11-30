@@ -14,6 +14,7 @@
         "no-redeclare": 2,
         "no-regex-spaces": 0,
         "no-unused-vars": 2,
+        "no-undef": 2,
         "radix": 2,
         "semi": [ 2, "always" ],
         "guard-for-in": 2,

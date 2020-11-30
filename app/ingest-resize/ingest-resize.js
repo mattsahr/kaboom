@@ -1,11 +1,12 @@
 const fs = require( 'fs' );
 const path = require( 'path' );
-const { copyFile, replaceLastOrAdd } = require('./helpers/helpers.js');
-const nConvert = require('./helpers/n-convert.js');
-const collectMeta = require('./helpers/collect-meta.js');
-
-const DEFAULT_IMAGE_DIRECTORY = '__original';
-const GALLERY_PATH = './gallery-active';
+const { copyFile, replaceLastOrAdd } = require('../helpers/helpers.js');
+const nConvert = require('../helpers/n-convert.js');
+const collectMeta = require('../helpers/collect-meta.js');
+const {
+    DEFAULT_IMAGE_DIRECTORY,
+    GALLERY_ACTIVE_PATH
+} = require('../constants.js');
 
 const TRANSFORM_SIZES = {
     microscopic: 'microscopic',
@@ -121,7 +122,7 @@ const processActiveImages = (() => {
     };
 
     return async galleryPath => {
-        const workingPath = galleryPath || GALLERY_PATH;
+        const workingPath = galleryPath || GALLERY_ACTIVE_PATH;
         const gallery = await fs.promises.readdir(workingPath);
 
         for (const item of gallery) {

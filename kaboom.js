@@ -1,6 +1,6 @@
-const processActiveImages = require('./app/ingest-resize/ingest-resize.js');
-const buildNav = require('./app/build-nav/build-nav.js');
-const serve = require('./app/serve/serve.js');
+const processActiveImages = require('./dev/ingest-resize/ingest-resize.js');
+const buildNav = require('./dev/build-nav/build-nav.js');
+const serve = require('./dev/serve/serve.js');
 
 const args = process.argv.slice(2);
 

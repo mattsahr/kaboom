@@ -1,14 +1,23 @@
 ### VS Code
 .vscode
 
+### Local resources
+.DS_Store
+
 ### Node template
 logs
 *.log
 node_modules/
 node_modules
+app/node_modules/
 
-### Local resources
-.DS_Store
+### Working Resources
+app/pages/__original/
+app/pages/microscopic/
+app/pages/tiny/
+app/pages/small/
+app/pages/medium/
+app/pages/large/
 
 ### Gallery Data
 gallery-active/

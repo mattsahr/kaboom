@@ -35,5 +35,8 @@
         "module": true,
         "process": true,
         "require": true,
+        "window": true,
+        "XMLHttpRequest": true,
+        "document": "writable"
     }
 }

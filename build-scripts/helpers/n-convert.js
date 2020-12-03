@@ -9,12 +9,12 @@ const base = 'nconvert -ratio -rtype lanczos -rexifthumb -opthuff -overwrite ';
 const quality = '-q 70 ';
 
 const commands = {
-    microscopic: base + '-q 7 -rmeta -smoothingf 9 ' + 
-                                  '-resize longest  120 -i ',
+    microscopic: base + ' -q 7 -rmeta ' + 
+                                  '-resize longest  100 -i ',
     tiny:        base + quality + '-resize longest  400 -i ',
     small:       base + quality + '-resize longest  700 -i ',
     medium:      base + quality + '-resize longest 1200 -i ',
-    large:       base + quality + '-resize longest 1700 -i ',
+    large:       base + quality + '-resize longest 1700 -i '
 };
 
 const nConvert = (size, filepath, successCallback) => {

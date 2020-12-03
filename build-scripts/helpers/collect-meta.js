@@ -58,7 +58,9 @@ const collectMeta = async (albumDirectory, size, originals) => {
         if( stat.isFile() ) {
             count++;
             const image = await Jimp.read(fromPath);
-            const dataURI = await image.getBase64Async(Jimp.MIME_JPEG);
+            const dataURI = count < 5 
+                ? await image.getBase64Async(Jimp.MIME_JPEG)
+                : 'noData';
 
             const baseFileName = replaceLastOrAdd(fileName, '--' + size, '');
 

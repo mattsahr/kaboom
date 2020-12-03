@@ -1,4 +1,5 @@
 import svelte from 'rollup-plugin-svelte';
+// import copy from 'rollup-plugin-copy';
 import commonjs from '@rollup/plugin-commonjs';
 import resolve from '@rollup/plugin-node-resolve';
 import livereload from 'rollup-plugin-livereload';
@@ -57,6 +58,12 @@ export default {
 			dedupe: ['svelte']
 		}),
 		commonjs(),
+
+		// copy({
+		// 	targets: [
+		// 		{ src: 'templates/loader.js', dest: 'pages/__app' }
+		// 	]
+		// }),
 
 		// In dev mode, call `npm run start` once
 		// the bundle has been generated

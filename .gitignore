@@ -18,6 +18,8 @@ app/pages/tiny/
 app/pages/small/
 app/pages/medium/
 app/pages/large/
+app/pages/album-meta.json
+
 
 ### Gallery Data
 gallery-active/

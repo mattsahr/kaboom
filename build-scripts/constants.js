@@ -1,6 +1,6 @@
 module.exports = {
     ALBUM_META_JSON: 'album-meta.json',
-    APP_DIRECTORY: './app/public',
+    APP_DIRECTORY: './app/pages',
     DEFAULT_IMAGE_DIRECTORY: '__original',
     DEMO_ALBUM: 'demo-album',
     DEMO_PIX: [

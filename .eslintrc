@@ -36,7 +36,17 @@
         "process": true,
         "require": true,
         "window": true,
+        "fetch": true,
         "XMLHttpRequest": true,
         "document": "writable"
-    }
+    },
+    plugins: [
+        'svelte3'
+    ],
+    overrides: [
+        {
+          files: ['*.svelte'],
+          processor: 'svelte3/svelte3'
+        }
+  ]
 }

@@ -6,9 +6,88 @@
 	<title>ALBUM!</title>
 
 	<link rel='icon' type='image/png' href='/favicon.png'>
-	<link rel='stylesheet' href='__app/global.css'>
-	<link rel='stylesheet' href='__app//bundle.css'>
-	<script defer src='__app/album-app.js'></script>
+
+    <script type="text/javascript">
+        "use strict";
+        (() => {
+            const composeStartCache = appName => {
+                const cache = {};
+
+                return source => payload => {
+                    if (source === 'app') {
+                        if (cache.data) {
+                            window[appName](cache.data);
+                        } else {
+                            cache.app = window[appName];    
+                        }
+                    }
+
+                    if (source === 'data') {
+                        if (cache.app) {
+                            cache.app(payload);
+                        } else {
+                            cache.data = payload;
+                        }
+                    }
+
+                };
+
+            };
+
+            const kickstart = composeStartCache('StartApp');
+            const navstart = composeStartCache('NavApp');
+
+            const loadData = async () => {
+                const req = await fetch('album-meta.json');
+                if (req.status === 200) {
+                    const galleryData = await req.json();
+                    kickstart('data')(galleryData);
+                } else {
+                    console.error('Data Load Error: album-meta.json', req.status);
+                    console.log(req);
+                }
+            };
+
+            const loadNavData = async () => {
+                const req = await fetch('../nav.json');
+                if (req.status === 200) {
+                    const navData = await req.json();
+                    navstart('data')(navData);
+                } else {
+                    console.error('Data Load Error: nav.json', req.status);
+                    console.log(req);
+                }
+            };
+
+            var loadScript = (src, callback) => {
+                const fileRequest = document.createElement('script');
+                fileRequest.setAttribute('async', true);
+                fileRequest.setAttribute('type', "text/javascript");
+                fileRequest.setAttribute('src', src);
+                fileRequest.onload = callback;
+                document.getElementsByTagName("head")[0].appendChild(fileRequest);
+            }
+
+            const loadApp = () => {
+                loadData();
+                loadScript('__app/album-app.js', kickstart('app'));
+            };
+
+            const loadNav = () => {
+                loadNavData();
+                loadScript('__app/nav-app.js', navstart('app'));
+            }
+
+            loadApp();
+          // setTimeout(loadNav, 500);
+
+        })();
+    </script>
+
+    <!-- non-critical CSS, may load late -->
+    <link rel='stylesheet' href='__app/global.css' media="none" onload="if(media!='all')media='all'">
+    <link rel='stylesheet' href='__app//bundle.css' media="none" onload="if(media!='all')media='all'">
+
 </head>
 
 <body>

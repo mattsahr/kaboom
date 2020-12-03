@@ -1,9 +1,9 @@
 <script>
-	export let GALLERY;
+	import GalleryStore from './store/store';
 </script>
 
 <main>
-	<h1>Hello {GALLERY.title}!</h1>
+	<h1>Hello {$GalleryStore.title}!</h1>
 	<p>Visit the <a href="https://svelte.dev/tutorial">Svelte tutorial</a> to learn how to build Svelte apps.</p>
 </main>
 

@@ -2,6 +2,7 @@ const fs = require( 'fs' );
 const path = require( 'path' );
 const { copyFile, replaceLastOrAdd } = require('../helpers/helpers.js');
 const nConvert = require('../helpers/n-convert.js');
+const primitive = require('../helpers/primitive.js');
 const collectMeta = require('../helpers/collect-meta.js');
 const {
     DEFAULT_IMAGE_DIRECTORY,
@@ -9,11 +10,13 @@ const {
 } = require('../constants.js');
 
 const TRANSFORM_SIZES = {
-    microscopic: 'microscopic',
-    // tiny: 'tiny',
-    // small: 'small',
-    medium: 'medium'
-    // large: 'large'
+    // microscopic: 'microscopic',
+    tiny: 'tiny',
+    small: 'small',
+    medium: 'medium',
+    large: 'large',
+    svg: 'svg'
+    // png: 'png'
 };
 
 const transform = (size, source, destination, handleResults) => {
@@ -31,6 +34,8 @@ const transform = (size, source, destination, handleResults) => {
 };
 
 const batchTransform = async (size, remoteDir) => {
+
+    if (size === 'svg') { return; }
 
     if (!TRANSFORM_SIZES[size]) {
         console.error('No handler for size: ' + size);
@@ -71,7 +76,9 @@ const batchTransform = async (size, remoteDir) => {
         if(stat.isFile()) {
 
             totalToProcess++;
-            const sizedFile = replaceLastOrAdd(imagePath, '.jpg', '--' + size + '.jpg');
+            const sizedFile = size === 'png'
+                ? replaceLastOrAdd(imagePath, '.jpg', '.png')
+                : replaceLastOrAdd(imagePath, '.jpg', '--' + size + '.jpg');
 
             const destinationPath = path.join(remoteDir, destination, sizedFile);
             transform(size, fromPath, destinationPath, handleTransformResults);
@@ -79,11 +86,53 @@ const batchTransform = async (size, remoteDir) => {
     }
 };
 
+const buildSVG = async (albumPath) => {
+    const sourcePath = path.join(albumPath, DEFAULT_IMAGE_DIRECTORY);
+    const sourceImages = await fs.promises.readdir(sourcePath);
+
+    const toProcess = [];
+    let total = 0;
+    let finished = 0;
+
+    const handleConversionResults = (destination) => {
+        finished++;
+        if (finished >= total) {
+            console.log(' ');
+            console.log('---- Collect SVG strings in a json file ----');
+            collectMeta(albumPath, 'svg', DEFAULT_IMAGE_DIRECTORY);
+        } else {
+            console.log(
+                'SVG [ ' + finished + ' ] of ' + total + ':  ' + destination
+            );
+        }
+    };    
+
+    for(const imagePath of sourceImages) {
+        const fromPath = path.join(sourcePath, imagePath);
+        const stat = await fs.promises.stat(fromPath);
+
+        if(stat.isFile()) {
+           toProcess.push(imagePath);
+           total++;
+       }
+    }
+
+    while(toProcess.length) {
+        const imagePath = toProcess.shift();
+        const fromPath = path.join(sourcePath, imagePath);
+
+        const svgFile = replaceLastOrAdd(imagePath, '.jpg', '.svg');
+        const destinationPath = path.join(albumPath, 'svg', svgFile);
+
+        primitive(fromPath, destinationPath, handleConversionResults);
+    }
+};
 
 const albumTransform = async albumPath => {
     for (const size of Object.values(TRANSFORM_SIZES)) {
         batchTransform(size, albumPath);
-    } 
+    }
+    buildSVG(albumPath);
 };
 
 

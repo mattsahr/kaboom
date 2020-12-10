@@ -4,6 +4,13 @@
     'use strict';
 
     function noop() { }
+    const identity = x => x;
+    function assign(tar, src) {
+        // @ts-ignore
+        for (const k in src)
+            tar[k] = src[k];
+        return tar;
+    }
     function add_location(element, file, line, column, char) {
         element.__svelte_meta = {
             loc: { file, line, column, char }
@@ -42,6 +49,83 @@
     function component_subscribe(component, store, callback) {
         component.$$.on_destroy.push(subscribe(store, callback));
     }
+    function create_slot(definition, ctx, $$scope, fn) {
+        if (definition) {
+            const slot_ctx = get_slot_context(definition, ctx, $$scope, fn);
+            return definition[0](slot_ctx);
+        }
+    }
+    function get_slot_context(definition, ctx, $$scope, fn) {
+        return definition[1] && fn
+            ? assign($$scope.ctx.slice(), definition[1](fn(ctx)))
+            : $$scope.ctx;
+    }
+    function get_slot_changes(definition, $$scope, dirty, fn) {
+        if (definition[2] && fn) {
+            const lets = definition[2](fn(dirty));
+            if ($$scope.dirty === undefined) {
+                return lets;
+            }
+            if (typeof lets === 'object') {
+                const merged = [];
+                const len = Math.max($$scope.dirty.length, lets.length);
+                for (let i = 0; i < len; i += 1) {
+                    merged[i] = $$scope.dirty[i] | lets[i];
+                }
+                return merged;
+            }
+            return $$scope.dirty | lets;
+        }
+        return $$scope.dirty;
+    }
+    function update_slot(slot, slot_definition, ctx, $$scope, dirty, get_slot_changes_fn, get_slot_context_fn) {
+        const slot_changes = get_slot_changes(slot_definition, $$scope, dirty, get_slot_changes_fn);
+        if (slot_changes) {
+            const slot_context = get_slot_context(slot_definition, ctx, $$scope, get_slot_context_fn);
+            slot.p(slot_context, slot_changes);
+        }
+    }
+    function null_to_empty(value) {
+        return value == null ? '' : value;
+    }
+    function action_destroyer(action_result) {
+        return action_result && is_function(action_result.destroy) ? action_result.destroy : noop;
+    }
+
+    const is_client = typeof window !== 'undefined';
+    let now = is_client
+        ? () => window.performance.now()
+        : () => Date.now();
+    let raf = is_client ? cb => requestAnimationFrame(cb) : noop;
+
+    const tasks = new Set();
+    function run_tasks(now) {
+        tasks.forEach(task => {
+            if (!task.c(now)) {
+                tasks.delete(task);
+                task.f();
+            }
+        });
+        if (tasks.size !== 0)
+            raf(run_tasks);
+    }
+    /**
+     * Creates a new task that runs on each raf frame
+     * until it returns a falsy value or is aborted
+     */
+    function loop(callback) {
+        let task;
+        if (tasks.size === 0)
+            raf(run_tasks);
+        return {
+            promise: new Promise(fulfill => {
+                tasks.add(task = { c: callback, f: fulfill });
+            }),
+            abort() {
+                tasks.delete(task);
+            }
+        };
+    }
 
     function append(target, node) {
         target.appendChild(node);
@@ -52,14 +136,30 @@
     function detach(node) {
         node.parentNode.removeChild(node);
     }
+    function destroy_each(iterations, detaching) {
+        for (let i = 0; i < iterations.length; i += 1) {
+            if (iterations[i])
+                iterations[i].d(detaching);
+        }
+    }
     function element(name) {
         return document.createElement(name);
+    }
+    function svg_element(name) {
+        return document.createElementNS('http://www.w3.org/2000/svg', name);
     }
     function text(data) {
         return document.createTextNode(data);
     }
     function space() {
         return text(' ');
+    }
+    function empty() {
+        return text('');
+    }
+    function listen(node, event, handler, options) {
+        node.addEventListener(event, handler, options);
+        return () => node.removeEventListener(event, handler, options);
     }
     function attr(node, attribute, value) {
         if (value == null)
@@ -70,15 +170,156 @@
     function children(element) {
         return Array.from(element.childNodes);
     }
+    function toggle_class(element, name, toggle) {
+        element.classList[toggle ? 'add' : 'remove'](name);
+    }
     function custom_event(type, detail) {
         const e = document.createEvent('CustomEvent');
         e.initCustomEvent(type, false, false, detail);
         return e;
     }
 
+    const active_docs = new Set();
+    let active = 0;
+    // https://github.com/darkskyapp/string-hash/blob/master/index.js
+    function hash(str) {
+        let hash = 5381;
+        let i = str.length;
+        while (i--)
+            hash = ((hash << 5) - hash) ^ str.charCodeAt(i);
+        return hash >>> 0;
+    }
+    function create_rule(node, a, b, duration, delay, ease, fn, uid = 0) {
+        const step = 16.666 / duration;
+        let keyframes = '{\n';
+        for (let p = 0; p <= 1; p += step) {
+            const t = a + (b - a) * ease(p);
+            keyframes += p * 100 + `%{${fn(t, 1 - t)}}\n`;
+        }
+        const rule = keyframes + `100% {${fn(b, 1 - b)}}\n}`;
+        const name = `__svelte_${hash(rule)}_${uid}`;
+        const doc = node.ownerDocument;
+        active_docs.add(doc);
+        const stylesheet = doc.__svelte_stylesheet || (doc.__svelte_stylesheet = doc.head.appendChild(element('style')).sheet);
+        const current_rules = doc.__svelte_rules || (doc.__svelte_rules = {});
+        if (!current_rules[name]) {
+            current_rules[name] = true;
+            stylesheet.insertRule(`@keyframes ${name} ${rule}`, stylesheet.cssRules.length);
+        }
+        const animation = node.style.animation || '';
+        node.style.animation = `${animation ? `${animation}, ` : ''}${name} ${duration}ms linear ${delay}ms 1 both`;
+        active += 1;
+        return name;
+    }
+    function delete_rule(node, name) {
+        const previous = (node.style.animation || '').split(', ');
+        const next = previous.filter(name
+            ? anim => anim.indexOf(name) < 0 // remove specific animation
+            : anim => anim.indexOf('__svelte') === -1 // remove all Svelte animations
+        );
+        const deleted = previous.length - next.length;
+        if (deleted) {
+            node.style.animation = next.join(', ');
+            active -= deleted;
+            if (!active)
+                clear_rules();
+        }
+    }
+    function clear_rules() {
+        raf(() => {
+            if (active)
+                return;
+            active_docs.forEach(doc => {
+                const stylesheet = doc.__svelte_stylesheet;
+                let i = stylesheet.cssRules.length;
+                while (i--)
+                    stylesheet.deleteRule(i);
+                doc.__svelte_rules = {};
+            });
+            active_docs.clear();
+        });
+    }
+
+    function create_animation(node, from, fn, params) {
+        if (!from)
+            return noop;
+        const to = node.getBoundingClientRect();
+        if (from.left === to.left && from.right === to.right && from.top === to.top && from.bottom === to.bottom)
+            return noop;
+        const { delay = 0, duration = 300, easing = identity, 
+        // @ts-ignore todo: should this be separated from destructuring? Or start/end added to public api and documentation?
+        start: start_time = now() + delay, 
+        // @ts-ignore todo:
+        end = start_time + duration, tick = noop, css } = fn(node, { from, to }, params);
+        let running = true;
+        let started = false;
+        let name;
+        function start() {
+            if (css) {
+                name = create_rule(node, 0, 1, duration, delay, easing, css);
+            }
+            if (!delay) {
+                started = true;
+            }
+        }
+        function stop() {
+            if (css)
+                delete_rule(node, name);
+            running = false;
+        }
+        loop(now => {
+            if (!started && now >= start_time) {
+                started = true;
+            }
+            if (started && now >= end) {
+                tick(1, 0);
+                stop();
+            }
+            if (!running) {
+                return false;
+            }
+            if (started) {
+                const p = now - start_time;
+                const t = 0 + 1 * easing(p / duration);
+                tick(t, 1 - t);
+            }
+            return true;
+        });
+        start();
+        tick(0, 1);
+        return stop;
+    }
+    function fix_position(node) {
+        const style = getComputedStyle(node);
+        if (style.position !== 'absolute' && style.position !== 'fixed') {
+            const { width, height } = style;
+            const a = node.getBoundingClientRect();
+            node.style.position = 'absolute';
+            node.style.width = width;
+            node.style.height = height;
+            add_transform(node, a);
+        }
+    }
+    function add_transform(node, a) {
+        const b = node.getBoundingClientRect();
+        if (a.left !== b.left || a.top !== b.top) {
+            const style = getComputedStyle(node);
+            const transform = style.transform === 'none' ? '' : style.transform;
+            node.style.transform = `${transform} translate(${a.left - b.left}px, ${a.top - b.top}px)`;
+        }
+    }
+
     let current_component;
     function set_current_component(component) {
         current_component = component;
+    }
+    function get_current_component() {
+        if (!current_component)
+            throw new Error('Function called outside component initialization');
+        return current_component;
+    }
+    function onMount(fn) {
+        get_current_component().$$.on_mount.push(fn);
     }
 
     const dirty_components = [];
@@ -144,12 +385,278 @@
             $$.after_update.forEach(add_render_callback);
         }
     }
+
+    let promise;
+    function wait() {
+        if (!promise) {
+            promise = Promise.resolve();
+            promise.then(() => {
+                promise = null;
+            });
+        }
+        return promise;
+    }
+    function dispatch(node, direction, kind) {
+        node.dispatchEvent(custom_event(`${direction ? 'intro' : 'outro'}${kind}`));
+    }
     const outroing = new Set();
+    let outros;
+    function group_outros() {
+        outros = {
+            r: 0,
+            c: [],
+            p: outros // parent group
+        };
+    }
+    function check_outros() {
+        if (!outros.r) {
+            run_all(outros.c);
+        }
+        outros = outros.p;
+    }
     function transition_in(block, local) {
         if (block && block.i) {
             outroing.delete(block);
             block.i(local);
         }
+    }
+    function transition_out(block, local, detach, callback) {
+        if (block && block.o) {
+            if (outroing.has(block))
+                return;
+            outroing.add(block);
+            outros.c.push(() => {
+                outroing.delete(block);
+                if (callback) {
+                    if (detach)
+                        block.d(1);
+                    callback();
+                }
+            });
+            block.o(local);
+        }
+    }
+    const null_transition = { duration: 0 };
+    function create_in_transition(node, fn, params) {
+        let config = fn(node, params);
+        let running = false;
+        let animation_name;
+        let task;
+        let uid = 0;
+        function cleanup() {
+            if (animation_name)
+                delete_rule(node, animation_name);
+        }
+        function go() {
+            const { delay = 0, duration = 300, easing = identity, tick = noop, css } = config || null_transition;
+            if (css)
+                animation_name = create_rule(node, 0, 1, duration, delay, easing, css, uid++);
+            tick(0, 1);
+            const start_time = now() + delay;
+            const end_time = start_time + duration;
+            if (task)
+                task.abort();
+            running = true;
+            add_render_callback(() => dispatch(node, true, 'start'));
+            task = loop(now => {
+                if (running) {
+                    if (now >= end_time) {
+                        tick(1, 0);
+                        dispatch(node, true, 'end');
+                        cleanup();
+                        return running = false;
+                    }
+                    if (now >= start_time) {
+                        const t = easing((now - start_time) / duration);
+                        tick(t, 1 - t);
+                    }
+                }
+                return running;
+            });
+        }
+        let started = false;
+        return {
+            start() {
+                if (started)
+                    return;
+                delete_rule(node);
+                if (is_function(config)) {
+                    config = config();
+                    wait().then(go);
+                }
+                else {
+                    go();
+                }
+            },
+            invalidate() {
+                started = false;
+            },
+            end() {
+                if (running) {
+                    cleanup();
+                    running = false;
+                }
+            }
+        };
+    }
+    function create_out_transition(node, fn, params) {
+        let config = fn(node, params);
+        let running = true;
+        let animation_name;
+        const group = outros;
+        group.r += 1;
+        function go() {
+            const { delay = 0, duration = 300, easing = identity, tick = noop, css } = config || null_transition;
+            if (css)
+                animation_name = create_rule(node, 1, 0, duration, delay, easing, css);
+            const start_time = now() + delay;
+            const end_time = start_time + duration;
+            add_render_callback(() => dispatch(node, false, 'start'));
+            loop(now => {
+                if (running) {
+                    if (now >= end_time) {
+                        tick(0, 1);
+                        dispatch(node, false, 'end');
+                        if (!--group.r) {
+                            // this will result in `end()` being called,
+                            // so we don't need to clean up here
+                            run_all(group.c);
+                        }
+                        return false;
+                    }
+                    if (now >= start_time) {
+                        const t = easing((now - start_time) / duration);
+                        tick(1 - t, t);
+                    }
+                }
+                return running;
+            });
+        }
+        if (is_function(config)) {
+            wait().then(() => {
+                // @ts-ignore
+                config = config();
+                go();
+            });
+        }
+        else {
+            go();
+        }
+        return {
+            end(reset) {
+                if (reset && config.tick) {
+                    config.tick(1, 0);
+                }
+                if (running) {
+                    if (animation_name)
+                        delete_rule(node, animation_name);
+                    running = false;
+                }
+            }
+        };
+    }
+
+    const globals = (typeof window !== 'undefined'
+        ? window
+        : typeof globalThis !== 'undefined'
+            ? globalThis
+            : global);
+    function outro_and_destroy_block(block, lookup) {
+        transition_out(block, 1, 1, () => {
+            lookup.delete(block.key);
+        });
+    }
+    function fix_and_outro_and_destroy_block(block, lookup) {
+        block.f();
+        outro_and_destroy_block(block, lookup);
+    }
+    function update_keyed_each(old_blocks, dirty, get_key, dynamic, ctx, list, lookup, node, destroy, create_each_block, next, get_context) {
+        let o = old_blocks.length;
+        let n = list.length;
+        let i = o;
+        const old_indexes = {};
+        while (i--)
+            old_indexes[old_blocks[i].key] = i;
+        const new_blocks = [];
+        const new_lookup = new Map();
+        const deltas = new Map();
+        i = n;
+        while (i--) {
+            const child_ctx = get_context(ctx, list, i);
+            const key = get_key(child_ctx);
+            let block = lookup.get(key);
+            if (!block) {
+                block = create_each_block(key, child_ctx);
+                block.c();
+            }
+            else if (dynamic) {
+                block.p(child_ctx, dirty);
+            }
+            new_lookup.set(key, new_blocks[i] = block);
+            if (key in old_indexes)
+                deltas.set(key, Math.abs(i - old_indexes[key]));
+        }
+        const will_move = new Set();
+        const did_move = new Set();
+        function insert(block) {
+            transition_in(block, 1);
+            block.m(node, next);
+            lookup.set(block.key, block);
+            next = block.first;
+            n--;
+        }
+        while (o && n) {
+            const new_block = new_blocks[n - 1];
+            const old_block = old_blocks[o - 1];
+            const new_key = new_block.key;
+            const old_key = old_block.key;
+            if (new_block === old_block) {
+                // do nothing
+                next = new_block.first;
+                o--;
+                n--;
+            }
+            else if (!new_lookup.has(old_key)) {
+                // remove old block
+                destroy(old_block, lookup);
+                o--;
+            }
+            else if (!lookup.has(new_key) || will_move.has(new_key)) {
+                insert(new_block);
+            }
+            else if (did_move.has(old_key)) {
+                o--;
+            }
+            else if (deltas.get(new_key) > deltas.get(old_key)) {
+                did_move.add(new_key);
+                insert(new_block);
+            }
+            else {
+                will_move.add(old_key);
+                o--;
+            }
+        }
+        while (o--) {
+            const old_block = old_blocks[o];
+            if (!new_lookup.has(old_block.key))
+                destroy(old_block, lookup);
+        }
+        while (n)
+            insert(new_blocks[n - 1]);
+        return new_blocks;
+    }
+    function validate_each_keys(ctx, list, get_context, get_key) {
+        const keys = new Set();
+        for (let i = 0; i < list.length; i++) {
+            const key = get_key(get_context(ctx, list, i));
+            if (keys.has(key)) {
+                throw new Error('Cannot have duplicate keys in a keyed each');
+            }
+            keys.add(key);
+        }
+    }
+    function create_component(block) {
+        block && block.c();
     }
     function mount_component(component, target, anchor) {
         const { fragment, on_mount, on_destroy, after_update } = component.$$;
@@ -285,6 +792,19 @@
         dispatch_dev('SvelteDOMRemove', { node });
         detach(node);
     }
+    function listen_dev(node, event, handler, options, has_prevent_default, has_stop_propagation) {
+        const modifiers = options === true ? ['capture'] : options ? Array.from(Object.keys(options)) : [];
+        if (has_prevent_default)
+            modifiers.push('preventDefault');
+        if (has_stop_propagation)
+            modifiers.push('stopPropagation');
+        dispatch_dev('SvelteDOMAddEventListener', { node, event, handler, modifiers });
+        const dispose = listen(node, event, handler, options);
+        return () => {
+            dispatch_dev('SvelteDOMRemoveEventListener', { node, event, handler, modifiers });
+            dispose();
+        };
+    }
     function attr_dev(node, attribute, value) {
         attr(node, attribute, value);
         if (value == null)
@@ -298,6 +818,15 @@
             return;
         dispatch_dev('SvelteDOMSetData', { node: text, data });
         text.data = data;
+    }
+    function validate_each_argument(arg) {
+        if (typeof arg !== 'string' && !(arg && typeof arg === 'object' && 'length' in arg)) {
+            let msg = '{#each} only iterates over array-like objects.';
+            if (typeof Symbol === 'function' && arg && Symbol.iterator in arg) {
+                msg += ' You can use a spread to convert this iterable into an array.';
+            }
+            throw new Error(msg);
+        }
     }
     function validate_slots(name, slot, keys) {
         for (const slot_key of Object.keys(slot)) {
@@ -321,6 +850,24 @@
         }
         $capture_state() { }
         $inject_state() { }
+    }
+
+    function cubicOut(t) {
+        const f = t - 1.0;
+        return f * f * f + 1.0;
+    }
+    function sineOut(t) {
+        return Math.sin((t * Math.PI) / 2);
+    }
+
+    function fade(node, { delay = 0, duration = 400, easing = identity }) {
+        const o = +getComputedStyle(node).opacity;
+        return {
+            delay,
+            duration,
+            easing,
+            css: t => `opacity: ${t * o}`
+        };
     }
 
     /**
@@ -607,9 +1154,9 @@
     var _root = root;
 
     /** Built-in value references. */
-    var Symbol = _root.Symbol;
+    var Symbol$1 = _root.Symbol;
 
-    var _Symbol = Symbol;
+    var _Symbol = Symbol$1;
 
     /** Used for built-in method references. */
     var objectProto = Object.prototype;
@@ -2286,9 +2833,9 @@
     var _Set = Set$1;
 
     /* Built-in method references that are verified to be native. */
-    var WeakMap = _getNative(_root, 'WeakMap');
+    var WeakMap$1 = _getNative(_root, 'WeakMap');
 
-    var _WeakMap = WeakMap;
+    var _WeakMap = WeakMap$1;
 
     /** `Object#toString` result references. */
     var mapTag$1 = '[object Map]',
@@ -2882,7 +3429,7 @@
         let GALLERY;
         subscribe(gallery => GALLERY = gallery);
 
-        const updateImages = (imageBatch) => {
+        const updateImages = imageBatch => {
             const updated = cloneDeep_1(GALLERY);
             updated.images = imageBatch;
             set(updated);
@@ -2923,10 +3470,29 @@
 
         };
 
+        const viewLightbox = fileName => {
+            const updated = cloneDeep_1(GALLERY);
+            updated.current = fileName;
+            updated.active = true;
+
+            console.log('STORE', updated);
+
+            set(updated);
+        };
+
+        const closeLightbox = () => {
+            const updated = cloneDeep_1(GALLERY);
+            updated.active = false;
+            set(updated);
+        };
+
         return {
             updateImages,
             getAllImages,
             loadFullJSON,
+
+            viewLightbox,
+            closeLightbox,
 
             subscribe,
             set,
@@ -2936,65 +3502,676 @@
 
     const GalleryStore = createGalleryStore();
 
-    /* templates\Album.svelte generated by Svelte v3.30.0 */
-    const file = "templates\\Album.svelte";
+    const replaceLastOrAdd = (input, find, replaceWith) => {
+        if (!input || !find || !input.length || !find.length) {
+            return input;
+        }
+
+        const lastIndex = input.lastIndexOf(find);
+        if (lastIndex < 0) {
+            return input + (replaceWith ? replaceWith : '');
+        }
+
+        return input.substr(0, lastIndex) + 
+            replaceWith + 
+            input.substr(lastIndex + find.length);
+    };
+
+    const getSizedPath = (size, fileName) => size === 'original' 
+        ? '__original/' + fileName
+        : size + '/' + replaceLastOrAdd(fileName, '.jpg', '--' + size + '.jpg');
+
+    // import Cookies from 'lib/cookies-js';
+
+    // =========== RESIZE END EVENT ===============================
+    (function() {
+        var EVENT_KEY = 'resizeend',
+            TIMEOUT = 200;
+        var timer;
+
+        function callResizeEnd() {
+            var event = new window.CustomEvent(EVENT_KEY);
+            window.dispatchEvent(event);
+        }
+
+        window.addEventListener('resize', () => {
+            clearTimeout(timer);
+            timer = setTimeout(callResizeEnd, TIMEOUT);
+        });
+    })();
+
+
+    // =========== EXPOSE DOCUMENT WIDTH TO THE APP =================
+    let docWidth = 0;
+    const getDocWidth = () => docWidth;
+    let docHeight = 0;
+    const getDocHeight = () => docHeight;
+
+    const refreshDocDimensions = () => {
+        const w = window;
+        const d = document;
+        const e = d.documentElement;
+        const g = d.getElementsByTagName('body')[0];
+        docWidth = w.innerWidth || e.clientWidth || g.clientWidth;
+        docHeight = w.innerHeight || e.clientHeight || g.clientHeight;
+    };
+    window.addEventListener('resizeend', refreshDocDimensions);
+    refreshDocDimensions();
+
+    const dummyImage = {
+        dataURI: ' data:image/jpeg;base64,/9j/4QAqRXhpZgAASUkqAAgAAAABAJiCAgAFAAAAGgAAAAAAAABLdW1lAAAAAP/sABFEdWNreQABAAQAAAAeAAD/4QSZaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLwA8P3hwYWNrZXQgYmVnaW49Iu+7vyIgaWQ9Ilc1TTBNcENlaGlIenJlU3pOVGN6a2M5ZCI/PiA8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJBZG9iZSBYTVAgQ29yZSA2LjAtYzAwMiA3OS4xNjQzNTIsIDIwMjAvMDEvMzAtMTU6NTA6MzggICAgICAgICI+IDxyZGY6UkRGIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+IDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiIHhtbG5zOnhtcFJpZ2h0cz0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL3JpZ2h0cy8iIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIiB4bWxuczpzdFJlZj0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL3NUeXBlL1Jlc291cmNlUmVmIyIgeG1sbnM6ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcFJpZ2h0czpXZWJTdGF0ZW1lbnQ9Imh0dHBzOi8vd3d3LmdldHR5aW1hZ2VzLmNvbS9ldWxhP3V0bV9tZWRpdW09b3JnYW5pYyZhbXA7dXRtX3NvdXJjZT1nb29nbGUmYW1wO3V0bV9jYW1wYWlnbj1pcHRjdXJsIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOkUwN0Y1MDRBMzZFNTExRUI5NkMwRjJCMzI5OTgzNEJBIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOkUwN0Y1MDQ5MzZFNTExRUI5NkMwRjJCMzI5OTgzNEJBIiB4bXA6Q3JlYXRvclRvb2w9IkFkb2JlIFBob3Rvc2hvcCAyMDIwIFdpbmRvd3MiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0iREE3MDYyN0U3OTgwODYwQUJCNkM1QTYwRjBERDI0OTUiIHN0UmVmOmRvY3VtZW50SUQ9IkRBNzA2MjdFNzk4MDg2MEFCQjZDNUE2MEYwREQyNDk1Ii8+IDxkYzpyaWdodHM+IDxyZGY6QWx0PiA8cmRmOmxpIHhtbDpsYW5nPSJ4LWRlZmF1bHQiPkt1bWVyPC9yZGY6bGk+IDwvcmRmOkFsdD4gPC9kYzpyaWdodHM+IDxkYzpjcmVhdG9yPiA8cmRmOlNlcT4gPHJkZjpsaT5LdW1lcjwvcmRmOmxpPiA8L3JkZjpTZXE+IDwvZGM6Y3JlYXRvcj4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz7/7QBSUGhvdG9zaG9wIDMuMAA4QklNBAQAAAAAABkcAVoAAxslRxwCAAACAAIcAnQABUt1bWVyADhCSU0EJQAAAAAAEM8ZAu5strHKPBzBtSJ29g//7gAOQWRvYmUAZMAAAAAB/9sAhAAQCwsLDAsQDAwQFw8NDxcbFBAQFBsfFxcXFxcfHhcaGhoaFx4eIyUnJSMeLy8zMy8vQEBAQEBAQEBAQEBAQEBAAREPDxETERUSEhUUERQRFBoUFhYUGiYaGhwaGiYwIx4eHh4jMCsuJycnLis1NTAwNTVAQD9AQEBAQEBAQEBAQED/wAARCAB4AHgDASIAAhEBAxEB/8QAcQABAQEBAQEBAAAAAAAAAAAAAAECBQQDBgEBAQAAAAAAAAAAAAAAAAAAAAEQAAIBAQELCwUBAAAAAAAAAAABAgMRITFBcZGhwRITMwXwYbHhIlJyglMEFVGB0TJCQxEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8A/btkbDIAbMsWiVkf3ajzO/kV0CEJr0+9mY1qfezMgMgtp97MOx3swEIash3sxNWPezAZIb1Fgkvun1mZRkudcwEICAAQAe1k5sgZmUtWEp4VcWN9RRmpV1OzB9r+pLoR8NIKRAoAAoKAKEUKFQRQPhXTpraWW0/7SvrnswrliypRktaLtX1PVZ98Zy6il7X3MoRfYvxxMD1AxCopq3CAPcYq7vHLoTKzNTdrxaAPkUFCIUFAFQKFCoIqAFQRpIAkc3iisq05YXG7lOmkc7iu8pYtIHwpSsBmmAOszM935tBSS3fm0AfMqKUCFRUUAVIiNICWGkCpAEipBIqQBI5vFt5SxPpOokcvjG8peF9LA8tMCmAOqP8APzaCFW782gCFQRUAKgioAioFSAJGkgkVIAkVIJGkigkcrjO9peHSzrJHK4zvaXh0sDxwApgg6ZqO7fiXQYNU3fi/6vY1yYGioFAFQSNJAEipBIqQBIqQSNJFBIqQSNJAEjkca31Lw6TsHA4nWVX3Vy9G4uX2A+VMCmCDogEA+kKyc9SVybux+krL9nOfaw8VWmqkNV378X9GrzPjD33uaPYqLaJYX+wHUSKkeBcWp4abzF+Wp+nLKB70jSRzvl6fpyyl+Yp+m8vUUdFI0kc35mn6Ty9Q+ap+lLL1AdNIqRzHxunZcpO3Hb+Dz1+L16icYLUT5YPyB7uIe+hQg4Rds3cdnQcNNyk5Svt2tletOWtJ2t4TUYgbggaigQe0gAA+VWmp3cIAHnlSsM7MABsxswAJsxswAGzGoABVA3GIAH0jEAAf/9k=',
+        fileName: 'NO_IMAGE',
+        width: 100,
+        height: 100
+    };
+
+    /**
+     * Get element position (with support old browsers)
+     * @param {Element} element
+     * @returns {{top: number, left: number}}
+     */
+    function getElementPosition(element) {
+        const box = element.getBoundingClientRect();
+
+        const { body, documentElement } = document;
+
+        const scrollTop = window.pageYOffset || documentElement.scrollTop || body.scrollTop;
+        const scrollLeft = window.pageXOffset || documentElement.scrollLeft || body.scrollLeft;
+
+        const clientTop = documentElement.clientTop || body.clientTop || 0;
+        const clientLeft = documentElement.clientLeft || body.clientLeft || 0;
+
+        const top = box.top + scrollTop - clientTop;
+        const left = box.left + scrollLeft - clientLeft;
+
+        return { top, left };
+    }
+
+    /**
+     * Universal alternative to Object.assign()
+     * @param {Object} destination
+     * @param {Object} source
+     * @returns {Object}
+     */
+    function extendObject(destination, source) {
+        if (destination && source) {
+            for (let key in source) {
+                if (source.hasOwnProperty(key)) {
+                    destination[key] = source[key];
+                }
+            }
+        }
+
+        return destination;
+    }
+
+    /**
+     * @param target
+     * @param type
+     * @param listener
+     * @param options
+     */
+    function on(target, type, listener, options = false) {
+        target.addEventListener(type, listener, options);
+    }
+
+    /**
+     * @param target
+     * @param type
+     * @param listener
+     * @param options
+     */
+    function off(target, type, listener, options = false) {
+        target.removeEventListener(type, listener, options);
+    }
+
+    function isTouch() {
+        return 'ontouchstart' in window || navigator.MaxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+    }
+
+    function eventClientX(event) {
+        return event.type === 'wheel' ||
+        event.type === 'mousedown' ||
+        event.type === 'mousemove' ||
+        event.type === 'mouseup' ? event.clientX : event.changedTouches[0].clientX;
+    }
+
+    function eventClientY(event) {
+        return event.type === 'wheel' ||
+        event.type === 'mousedown' ||
+        event.type === 'mousemove' ||
+        event.type === 'mouseup' ? event.clientY : event.changedTouches[0].clientY;
+    }
+
+    /**
+     * @class DragScrollable
+     * @param {Object} windowObject
+     * @param {Object} contentObject
+     * @param {Object} options
+     * @constructor
+     */
+    function DragScrollable(windowObject, contentObject, options = {}) {
+        this._dropHandler = this._dropHandler.bind(this);
+        this._grabHandler = this._grabHandler.bind(this);
+        this._moveHandler = this._moveHandler.bind(this);
+
+        this.options = extendObject({
+            // smooth extinction moving element after set loose
+            smoothExtinction: false,
+            // callback triggered when grabbing an element
+            onGrab: null,
+            // callback triggered when moving an element
+            onMove: null,
+            // callback triggered when dropping an element
+            onDrop: null
+        }, options);
+
+        // check if we're using a touch screen
+        this.isTouch = isTouch();
+        // switch to touch events if using a touch screen
+        this.events = this.isTouch ?
+            { grab: 'touchstart', move: 'touchmove', drop: 'touchend' } :
+            { grab: 'mousedown', move: 'mousemove', drop: 'mouseup' };
+        // if using touch screen tells the browser that the default action will not be undone
+        this.events.options = this.isTouch ? { passive: true } : false;
+
+        this.window = windowObject;
+        this.content = contentObject;
+
+        on(this.content.$element, this.events.grab, this._grabHandler, this.events.options);
+    }
+
+    DragScrollable.prototype = {
+        constructor: DragScrollable,
+        window: null,
+        content: null,
+        isTouch: false,
+        isGrab: false,
+        events: null,
+        moveTimer: null,
+        options: {},
+        coordinates: null,
+        speed: null,
+        _grabHandler(event) {
+            // if touch started (only one finger) or pressed left mouse button
+            if ((this.isTouch && event.touches.length === 1) || event.buttons === 1) {
+                if (!this.isTouch) event.preventDefault();
+
+                this.isGrab = true;
+                this.coordinates = { left: eventClientX(event), top: eventClientY(event) };
+                this.speed = { x: 0, y: 0 };
+
+                on(document, this.events.drop, this._dropHandler, this.events.options);
+                on(document, this.events.move, this._moveHandler, this.events.options);
+
+                if (typeof this.options.onGrab === 'function') {
+                    this.options.onGrab();
+                }
+            }
+        },
+        _dropHandler(event) {
+            if (!this.isTouch) event.preventDefault();
+
+            this.isGrab = false;
+
+            // if (this.options.smoothExtinction) {
+            //     _moveExtinction.call(this, 'scrollLeft', numberExtinction(this.speed.x));
+            //     _moveExtinction.call(this, 'scrollTop', numberExtinction(this.speed.y));
+            // }
+
+            off(document, this.events.drop, this._dropHandler);
+            off(document, this.events.move, this._moveHandler);
+
+            if (typeof this.options.onDrop === 'function') {
+                this.options.onDrop();
+            }
+        },
+        _moveHandler(event) {
+            if (!this.isTouch) event.preventDefault();
+
+            const { window, content, speed, coordinates, options } = this;
+
+            // speed of change of the coordinate of the mouse cursor along the X/Y axis
+            speed.x = eventClientX(event) - coordinates.left;
+            speed.y = eventClientY(event) - coordinates.top;
+
+            clearTimeout(this.moveTimer);
+
+            // reset speed data if cursor stops
+            this.moveTimer = setTimeout(() => {
+                speed.x = 0;
+                speed.y = 0;
+            }, 50);
+
+            const contentNewLeft = content.currentLeft + speed.x;
+            const contentNewTop = content.currentTop + speed.y;
+
+            let maxAvailableLeft = (content.currentWidth - window.originalWidth) / 2 + content.correctX;
+            let maxAvailableTop = (content.currentHeight - window.originalHeight) / 2 + content.correctY;
+
+            // if we do not go beyond the permissible boundaries of the window
+            if (Math.abs(contentNewLeft) <= maxAvailableLeft) content.currentLeft = contentNewLeft;
+
+            // if we do not go beyond the permissible boundaries of the window
+            if (Math.abs(contentNewTop) <= maxAvailableTop) content.currentTop = contentNewTop;
+
+            _transform(content.$element, {
+                left: content.currentLeft,
+                top: content.currentTop,
+                scale: content.currentScale
+            });
+
+            coordinates.left = eventClientX(event);
+            coordinates.top = eventClientY(event);
+
+            if (typeof options.onMove === 'function') {
+                options.onMove();
+            }
+        },
+        destroy() {
+            off(this.content.$element, this.events.grab, this._grabHandler, this.events.options);
+
+            for (let key in this) {
+                if (this.hasOwnProperty(key)) {
+                    this[key] = null;
+                }
+            }
+        }
+    };
+
+    function _transform($element, { left, top, scale }) {
+        $element.style.transform = `translate3d(${ left }px, ${ top }px, 0px) scale(${ scale })`;
+    }
+
+    /**
+     * @class WZoom
+     * @param {string} selector
+     * @param {Object} options
+     * @constructor
+     */
+
+    function WZoom(selector, options = {}) {
+        this._init = this._init.bind(this);
+        this._prepare = this._prepare.bind(this);
+        this._computeNewScale = this._computeNewScale.bind(this);
+        this._computeNewPosition = this._computeNewPosition.bind(this);
+        this._transform = this._transform.bind(this);
+
+        this._wheelHandler = _wheelHandler.bind(this);
+        this._downHandler = _downHandler.bind(this);
+        this._upHandler = _upHandler.bind(this);
+
+        const defaults = {
+            // type content: `image` - only one image, `html` - any HTML content
+            type: 'image',
+            // for type `image` computed auto (if width set null), for type `html` need set real html content width, else computed auto
+            width: null,
+            // for type `image` computed auto (if height set null), for type `html` need set real html content height, else computed auto
+            height: null,
+            // drag scrollable content
+            dragScrollable: true,
+            // options for the DragScrollable module
+            dragScrollableOptions: {},
+            // minimum allowed proportion of scale
+            minScale: null,
+            // maximum allowed proportion of scale
+            maxScale: 1,
+            // content resizing speed
+            speed: 50,
+            // zoom to maximum (minimum) size on click
+            zoomOnClick: true,
+            // if is true, then when the source image changes, the plugin will automatically restart init function (used with type = image)
+            // attention: if false, it will work correctly only if the images are of the same size
+            watchImageChange: true
+        };
+
+        this.content.$element = typeof(selector) === 'string' ? document.querySelector(selector) : selector;
+
+        // check if we're using a touch screen
+        this.isTouch = isTouch();
+        // switch to touch events if using a touch screen
+        this.events = this.isTouch ? { down: 'touchstart', up: 'touchend' } : { down: 'mousedown', up: 'mouseup' };
+        // if using touch screen tells the browser that the default action will not be undone
+        this.events.options = this.isTouch ? { passive: true } : false;
+
+        if (this.content.$element) {
+            this.options = extendObject(defaults, options);
+
+            if (this.options.minScale && this.options.minScale >= this.options.maxScale) {
+                this.options.minScale = null;
+            }
+
+            // for window take just the parent
+            this.window.$element = this.content.$element.parentNode;
+
+            console.log('this.window', this.window);
+
+            if (this.options.type === 'image') {
+                let initAlreadyDone = false;
+
+                // if the `image` has already been loaded
+                if (this.content.$element.complete) {
+                    this._init();
+                    initAlreadyDone = true;
+                }
+
+                if (!initAlreadyDone || this.options.watchImageChange === true) {
+                    // even if the `image` has already been loaded (for "hotswap" of src support)
+                    on(
+                        this.content.$element, 'load', this._init,
+                        // if watchImageChange == false listen add only until the first call
+                        this.options.watchImageChange ? false : { once: true }
+                    );
+                }
+            } else {
+                this._init();
+            }
+        }
+    }
+
+    WZoom.prototype = {
+        constructor: WZoom,
+        isTouch: false,
+        events: null,
+        content: {},
+        window: {},
+        direction: 1,
+        options: null,
+        dragScrollable: null,
+        // processing of the event "max / min zoom" begin only if there was really just a click
+        // so as not to interfere with the DragScrollable module
+        clickExpired: true,
+        _init() {
+            this._prepare();
+
+            if (this.options.dragScrollable === true) {
+                // this can happen if the src of this.content.$element (when type = image) is changed and repeat event load at image
+                if (this.dragScrollable) {
+                    this.dragScrollable.destroy();
+                }
+
+                this.dragScrollable = new DragScrollable(this.window, this.content, this.options.dragScrollableOptions);
+            }
+
+            on(this.content.$element, 'wheel', this._wheelHandler);
+
+            if (this.options.zoomOnClick) {
+                on(this.content.$element, this.events.down, this._downHandler, this.events.options);
+                on(this.content.$element, this.events.up, this._upHandler, this.events.options);
+            }
+        },
+        _prepare() {
+            const windowPosition = getElementPosition(this.window.$element);
+
+            // original window sizes and position
+            this.window.originalWidth = this.window.$element.offsetWidth;
+            this.window.originalHeight = this.window.$element.offsetHeight;
+            this.window.positionLeft = windowPosition.left;
+            this.window.positionTop = windowPosition.top;
+
+            // original content sizes
+            if (this.options.type === 'image') {
+                this.content.originalWidth = this.options.width || this.content.$element.naturalWidth;
+                this.content.originalHeight = this.options.height || this.content.$element.naturalHeight;
+            } else {
+                this.content.originalWidth = this.options.width || this.content.$element.offsetWidth;
+                this.content.originalHeight = this.options.height || this.content.$element.offsetHeight;
+            }
+
+            // minScale && maxScale
+            this.content.minScale = this.options.minScale || Math.min(this.window.originalWidth / this.content.originalWidth, this.window.originalHeight / this.content.originalHeight);
+            this.content.maxScale = this.options.maxScale;
+
+            // current content sizes and transform data
+            this.content.currentWidth = this.content.originalWidth * this.content.minScale;
+            this.content.currentHeight = this.content.originalHeight * this.content.minScale;
+            this.content.currentLeft = 0;
+            this.content.currentTop = 0;
+            this.content.currentScale = this.content.minScale;
+
+            // calculate indent-left and indent-top to of content from window borders
+            this.content.correctX = Math.max(0, (this.window.originalWidth - this.content.currentWidth) / 2);
+            this.content.correctY = Math.max(0, (this.window.originalHeight - this.content.currentHeight) / 2);
+
+            this.content.$element.style.transform = `translate3d(0px, 0px, 0px) scale(${ this.content.minScale })`;
+
+            if (typeof this.options.prepare === 'function') {
+                this.options.prepare();
+            }
+        },
+        _computeNewScale(delta) {
+            this.direction = delta < 0 ? 1 : -1;
+
+            const { minScale, maxScale, currentScale } = this.content;
+
+            let contentNewScale = currentScale + (this.direction / this.options.speed);
+
+            if (contentNewScale < minScale) {
+                this.direction = 1;
+            } else if (contentNewScale > maxScale) {
+                this.direction = -1;
+            }
+
+            return contentNewScale < minScale ? minScale : (contentNewScale > maxScale ? maxScale : contentNewScale);
+        },
+        _computeNewPosition(contentNewScale, { x, y }) {
+            const { window, content } = this;
+
+            const contentNewWidth = content.originalWidth * contentNewScale;
+            const contentNewHeight = content.originalHeight * contentNewScale;
+
+            const { body, documentElement } = document;
+
+            const scrollLeft = window.pageXOffset || documentElement.scrollLeft || body.scrollLeft;
+            const scrollTop = window.pageYOffset || documentElement.scrollTop || body.scrollTop;
+
+            // calculate the parameters along the X axis
+            const leftWindowShiftX = x + scrollLeft - window.positionLeft;
+            const centerWindowShiftX = window.originalWidth / 2 - leftWindowShiftX;
+            const centerContentShiftX = centerWindowShiftX + content.currentLeft;
+            let contentNewLeft = centerContentShiftX * (contentNewWidth / content.currentWidth) - centerContentShiftX + content.currentLeft;
+
+            // check that the content does not go beyond the X axis
+            if (this.direction === -1 && (contentNewWidth - window.originalWidth) / 2 + content.correctX < Math.abs(contentNewLeft)) {
+                const positive = contentNewLeft < 0 ? -1 : 1;
+                contentNewLeft = ((contentNewWidth - window.originalWidth) / 2 + content.correctX) * positive;
+            }
+
+            // calculate the parameters along the Y axis
+            const topWindowShiftY = y + scrollTop - window.positionTop;
+            const centerWindowShiftY = window.originalHeight / 2 - topWindowShiftY;
+            const centerContentShiftY = centerWindowShiftY + content.currentTop;
+            let contentNewTop = centerContentShiftY * (contentNewHeight / content.currentHeight) - centerContentShiftY + content.currentTop;
+
+            // check that the content does not go beyond the Y axis
+            if (this.direction === -1 && (contentNewHeight - window.originalHeight) / 2 + content.correctY < Math.abs(contentNewTop)) {
+                const positive = contentNewTop < 0 ? -1 : 1;
+                contentNewTop = ((contentNewHeight - window.originalHeight) / 2 + content.correctY) * positive;
+            }
+
+            if (contentNewScale === this.content.minScale) {
+                contentNewLeft = contentNewTop = 0;
+            }
+
+            const response = {
+                currentLeft: content.currentLeft,
+                newLeft: contentNewLeft,
+                currentTop: content.currentTop,
+                newTop: contentNewTop,
+                currentScale: content.currentScale,
+                newScale: contentNewScale
+            };
+
+            content.currentWidth = contentNewWidth;
+            content.currentHeight = contentNewHeight;
+            content.currentLeft = contentNewLeft;
+            content.currentTop = contentNewTop;
+            content.currentScale = contentNewScale;
+
+            return response;
+        },
+        _transform({ currentLeft, newLeft, currentTop, newTop, currentScale, newScale }, iterations = 1) {
+            this.content.$element.style.transform = `translate3d(${ newLeft }px, ${ newTop }px, 0px) scale(${ newScale })`;
+
+            if (typeof this.options.rescale === 'function') {
+                this.options.rescale();
+            }
+        },
+        _zoom(direction) {
+            const windowPosition = getElementPosition(this.window.$element);
+
+            const { window } = this;
+            const { body, documentElement } = document;
+
+            const scrollLeft = window.pageXOffset || documentElement.scrollLeft || body.scrollLeft;
+            const scrollTop = window.pageYOffset || documentElement.scrollTop || body.scrollTop;
+
+            this._transform(
+                this._computeNewPosition(
+                    this._computeNewScale(direction), {
+                        x: windowPosition.left + (this.window.originalWidth / 2) - scrollLeft,
+                        y: windowPosition.top + (this.window.originalHeight / 2) - scrollTop
+                    }));
+        },
+        prepare() {
+            this._prepare();
+        },
+        zoomUp() {
+            this._zoom(-3);
+        },
+        zoomDown() {
+            this._zoom(3);
+        },
+        destroy() {
+            this.content.$element.style.transform = '';
+
+            if (this.options.type === 'image') {
+                off(this.content.$element, 'load', this._init);
+            }
+
+            off(this.window.$element, 'wheel', this._wheelHandler);
+            off(this.content.$element, 'wheel', this._wheelHandler);
+
+            if (this.options.zoomOnClick) {
+                off(this.window.$element, this.events.down, this._downHandler, this.events.options);
+                off(this.window.$element, this.events.up, this._upHandler, this.events.options);
+            }
+
+            if (this.dragScrollable) {
+                this.dragScrollable.destroy();
+            }
+
+            for (let key in this) {
+                if (this.hasOwnProperty(key)) {
+                    this[key] = null;
+                }
+            }
+        }
+    };
+
+    function _wheelHandler(event) {
+        event.preventDefault();
+
+        this._transform(
+            this._computeNewPosition(
+                this._computeNewScale(event.deltaY),
+                { x: eventClientX(event), y: eventClientY(event) }
+            )
+        );
+    }
+
+    function _downHandler(event) {
+        if ((this.isTouch && event.touches.length === 1) || event.buttons === 1) {
+            this.clickExpired = false;
+            setTimeout(() => this.clickExpired = true, 150);
+        }
+    }
+
+    function _upHandler(event) {
+        if (!this.clickExpired) {
+            this._transform(
+                this._computeNewPosition(
+                    this.direction === 1 ? this.content.maxScale : this.content.minScale, {
+                        x: eventClientX(event),
+                        y: eventClientY(event)
+                    }
+                )
+            );
+
+            this.direction *= -1;
+        }
+    }
+
+    /**
+     * Create WZoom instance
+     * @param {string} selector
+     * @param {Object} [options]
+     * @returns {WZoom}
+     */
+    WZoom.create = function (selector, options) {
+        return new WZoom(selector, options);
+    };
+
+    /* templates\components\icons\IconMagnify.svelte generated by Svelte v3.30.0 */
+
+    const file = "templates\\components\\icons\\IconMagnify.svelte";
 
     function create_fragment(ctx) {
-    	let main;
-    	let h1;
-    	let t0;
-    	let t1_value = /*$GalleryStore*/ ctx[0].title + "";
-    	let t1;
-    	let t2;
-    	let t3;
-    	let p;
-    	let t4;
-    	let a;
-    	let t6;
+    	let svg;
+    	let circle;
+    	let line0;
+    	let line1;
+    	let line2;
 
     	const block = {
     		c: function create() {
-    			main = element("main");
-    			h1 = element("h1");
-    			t0 = text("Hello ");
-    			t1 = text(t1_value);
-    			t2 = text("!");
-    			t3 = space();
-    			p = element("p");
-    			t4 = text("Visit the ");
-    			a = element("a");
-    			a.textContent = "Svelte tutorial";
-    			t6 = text(" to learn how to build Svelte apps.");
-    			attr_dev(h1, "class", "svelte-1tky8bj");
-    			add_location(h1, file, 5, 1, 76);
-    			attr_dev(a, "href", "https://svelte.dev/tutorial");
-    			add_location(a, file, 6, 14, 129);
-    			add_location(p, file, 6, 1, 116);
-    			attr_dev(main, "class", "svelte-1tky8bj");
-    			add_location(main, file, 4, 0, 67);
+    			svg = svg_element("svg");
+    			circle = svg_element("circle");
+    			line0 = svg_element("line");
+    			line1 = svg_element("line");
+    			line2 = svg_element("line");
+    			attr_dev(circle, "cx", "11");
+    			attr_dev(circle, "cy", "11");
+    			attr_dev(circle, "r", "8");
+    			add_location(circle, file, 2, 8, 143);
+    			attr_dev(line0, "x1", "21");
+    			attr_dev(line0, "y1", "21");
+    			attr_dev(line0, "x2", "16.65");
+    			attr_dev(line0, "y2", "16.65");
+    			add_location(line0, file, 3, 17, 192);
+    			attr_dev(line1, "x1", "11");
+    			attr_dev(line1, "y1", "8");
+    			attr_dev(line1, "x2", "11");
+    			attr_dev(line1, "y2", "14");
+    			add_location(line1, file, 4, 8, 253);
+    			attr_dev(line2, "x1", "8");
+    			attr_dev(line2, "y1", "11");
+    			attr_dev(line2, "x2", "14");
+    			attr_dev(line2, "y2", "11");
+    			add_location(line2, file, 5, 8, 307);
+    			attr_dev(svg, "stroke", "rgb(160,160,160)");
+    			attr_dev(svg, "fill", "none");
+    			attr_dev(svg, "stroke-width", "2");
+    			attr_dev(svg, "viewBox", "0 0 24 24");
+    			attr_dev(svg, "stroke-linecap", "round");
+    			attr_dev(svg, "stroke-linejoin", "round");
+    			add_location(svg, file, 0, 1, 1);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
     		},
     		m: function mount(target, anchor) {
-    			insert_dev(target, main, anchor);
-    			append_dev(main, h1);
-    			append_dev(h1, t0);
-    			append_dev(h1, t1);
-    			append_dev(h1, t2);
-    			append_dev(main, t3);
-    			append_dev(main, p);
-    			append_dev(p, t4);
-    			append_dev(p, a);
-    			append_dev(p, t6);
+    			insert_dev(target, svg, anchor);
+    			append_dev(svg, circle);
+    			append_dev(svg, line0);
+    			append_dev(svg, line1);
+    			append_dev(svg, line2);
     		},
-    		p: function update(ctx, [dirty]) {
-    			if (dirty & /*$GalleryStore*/ 1 && t1_value !== (t1_value = /*$GalleryStore*/ ctx[0].title + "")) set_data_dev(t1, t1_value);
-    		},
+    		p: noop,
     		i: noop,
     		o: noop,
     		d: function destroy(detaching) {
-    			if (detaching) detach_dev(main);
+    			if (detaching) detach_dev(svg);
     		}
     	};
 
@@ -3009,10 +4186,4778 @@
     	return block;
     }
 
-    function instance($$self, $$props, $$invalidate) {
+    function instance($$self, $$props) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots("IconMagnify", slots, []);
+    	const writable_props = [];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<IconMagnify> was created with unknown prop '${key}'`);
+    	});
+
+    	return [];
+    }
+
+    class IconMagnify extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance, create_fragment, safe_not_equal, {});
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "IconMagnify",
+    			options,
+    			id: create_fragment.name
+    		});
+    	}
+    }
+
+    /* templates\components\icons\IconDeMagnify.svelte generated by Svelte v3.30.0 */
+
+    const file$1 = "templates\\components\\icons\\IconDeMagnify.svelte";
+
+    function create_fragment$1(ctx) {
+    	let svg;
+    	let circle;
+    	let line0;
+    	let line1;
+
+    	const block = {
+    		c: function create() {
+    			svg = svg_element("svg");
+    			circle = svg_element("circle");
+    			line0 = svg_element("line");
+    			line1 = svg_element("line");
+    			attr_dev(circle, "cx", "11");
+    			attr_dev(circle, "cy", "11");
+    			attr_dev(circle, "r", "8");
+    			add_location(circle, file$1, 2, 8, 143);
+    			attr_dev(line0, "x1", "21");
+    			attr_dev(line0, "y1", "21");
+    			attr_dev(line0, "x2", "16.65");
+    			attr_dev(line0, "y2", "16.65");
+    			add_location(line0, file$1, 3, 8, 192);
+    			attr_dev(line1, "x1", "8");
+    			attr_dev(line1, "y1", "11");
+    			attr_dev(line1, "x2", "14");
+    			attr_dev(line1, "y2", "11");
+    			add_location(line1, file$1, 4, 8, 253);
+    			attr_dev(svg, "stroke", "rgb(160,160,160)");
+    			attr_dev(svg, "fill", "none");
+    			attr_dev(svg, "stroke-width", "2");
+    			attr_dev(svg, "viewBox", "0 0 24 24");
+    			attr_dev(svg, "stroke-linecap", "round");
+    			attr_dev(svg, "stroke-linejoin", "round");
+    			add_location(svg, file$1, 0, 1, 1);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, svg, anchor);
+    			append_dev(svg, circle);
+    			append_dev(svg, line0);
+    			append_dev(svg, line1);
+    		},
+    		p: noop,
+    		i: noop,
+    		o: noop,
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(svg);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$1.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$1($$self, $$props) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots("IconDeMagnify", slots, []);
+    	const writable_props = [];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<IconDeMagnify> was created with unknown prop '${key}'`);
+    	});
+
+    	return [];
+    }
+
+    class IconDeMagnify extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$1, create_fragment$1, safe_not_equal, {});
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "IconDeMagnify",
+    			options,
+    			id: create_fragment$1.name
+    		});
+    	}
+    }
+
+    /* templates\components\icons\IconChevronLeft.svelte generated by Svelte v3.30.0 */
+
+    const file$2 = "templates\\components\\icons\\IconChevronLeft.svelte";
+
+    function create_fragment$2(ctx) {
+    	let svg;
+    	let polyline0;
+    	let polyline1;
+
+    	const block = {
+    		c: function create() {
+    			svg = svg_element("svg");
+    			polyline0 = svg_element("polyline");
+    			polyline1 = svg_element("polyline");
+    			attr_dev(polyline0, "points", "30 10 10 30 30 50");
+    			attr_dev(polyline0, "stroke", "rgba(0,0,0,0.5)");
+    			attr_dev(polyline0, "stroke-width", "8");
+    			attr_dev(polyline0, "stroke-linecap", "square");
+    			attr_dev(polyline0, "fill", "none");
+    			attr_dev(polyline0, "stroke-linejoin", "round");
+    			add_location(polyline0, file$2, 1, 4, 34);
+    			attr_dev(polyline1, "points", "30 10 10 30 30 50");
+    			attr_dev(polyline1, "stroke", "rgba(255,255,255,0.5)");
+    			attr_dev(polyline1, "stroke-width", "4");
+    			attr_dev(polyline1, "stroke-linecap", "square");
+    			attr_dev(polyline1, "fill", "none");
+    			attr_dev(polyline1, "stroke-linejoin", "round");
+    			add_location(polyline1, file$2, 3, 4, 187);
+    			attr_dev(svg, "width", "44");
+    			attr_dev(svg, "height", "60");
+    			add_location(svg, file$2, 0, 0, 0);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, svg, anchor);
+    			append_dev(svg, polyline0);
+    			append_dev(svg, polyline1);
+    		},
+    		p: noop,
+    		i: noop,
+    		o: noop,
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(svg);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$2.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$2($$self, $$props) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots("IconChevronLeft", slots, []);
+    	const writable_props = [];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<IconChevronLeft> was created with unknown prop '${key}'`);
+    	});
+
+    	return [];
+    }
+
+    class IconChevronLeft extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$2, create_fragment$2, safe_not_equal, {});
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "IconChevronLeft",
+    			options,
+    			id: create_fragment$2.name
+    		});
+    	}
+    }
+
+    /* templates\components\icons\IconChevronRight.svelte generated by Svelte v3.30.0 */
+
+    const file$3 = "templates\\components\\icons\\IconChevronRight.svelte";
+
+    function create_fragment$3(ctx) {
+    	let svg;
+    	let polyline0;
+    	let polyline1;
+
+    	const block = {
+    		c: function create() {
+    			svg = svg_element("svg");
+    			polyline0 = svg_element("polyline");
+    			polyline1 = svg_element("polyline");
+    			attr_dev(polyline0, "points", "14 10 34 30 14 50");
+    			attr_dev(polyline0, "stroke", "rgba(0,0,0,0.5)");
+    			attr_dev(polyline0, "stroke-width", "8");
+    			attr_dev(polyline0, "stroke-linecap", "square");
+    			attr_dev(polyline0, "fill", "none");
+    			attr_dev(polyline0, "stroke-linejoin", "round");
+    			add_location(polyline0, file$3, 1, 4, 34);
+    			attr_dev(polyline1, "points", "14 10 34 30 14 50");
+    			attr_dev(polyline1, "stroke", "rgba(255,255,255,0.5)");
+    			attr_dev(polyline1, "stroke-width", "4");
+    			attr_dev(polyline1, "stroke-linecap", "square");
+    			attr_dev(polyline1, "fill", "none");
+    			attr_dev(polyline1, "stroke-linejoin", "round");
+    			add_location(polyline1, file$3, 3, 4, 187);
+    			attr_dev(svg, "width", "44");
+    			attr_dev(svg, "height", "60");
+    			add_location(svg, file$3, 0, 0, 0);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, svg, anchor);
+    			append_dev(svg, polyline0);
+    			append_dev(svg, polyline1);
+    		},
+    		p: noop,
+    		i: noop,
+    		o: noop,
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(svg);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$3.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$3($$self, $$props) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots("IconChevronRight", slots, []);
+    	const writable_props = [];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<IconChevronRight> was created with unknown prop '${key}'`);
+    	});
+
+    	return [];
+    }
+
+    class IconChevronRight extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$3, create_fragment$3, safe_not_equal, {});
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "IconChevronRight",
+    			options,
+    			id: create_fragment$3.name
+    		});
+    	}
+    }
+
+    /* templates\components\icons\IconX.svelte generated by Svelte v3.30.0 */
+
+    const file$4 = "templates\\components\\icons\\IconX.svelte";
+
+    function create_fragment$4(ctx) {
+    	let svg;
+    	let g;
+    	let line0;
+    	let line1;
+
+    	const block = {
+    		c: function create() {
+    			svg = svg_element("svg");
+    			g = svg_element("g");
+    			line0 = svg_element("line");
+    			line1 = svg_element("line");
+    			attr_dev(line0, "x1", "11");
+    			attr_dev(line0, "y1", "11");
+    			attr_dev(line0, "x2", "31");
+    			attr_dev(line0, "y2", "31");
+    			add_location(line0, file$4, 2, 8, 90);
+    			attr_dev(line1, "x1", "11");
+    			attr_dev(line1, "y1", "31");
+    			attr_dev(line1, "x2", "31");
+    			attr_dev(line1, "y2", "11");
+    			add_location(line1, file$4, 3, 8, 139);
+    			attr_dev(g, "stroke", "rgb(160,160,160)");
+    			attr_dev(g, "stroke-width", "4");
+    			add_location(g, file$4, 1, 4, 34);
+    			attr_dev(svg, "width", "36");
+    			attr_dev(svg, "height", "36");
+    			add_location(svg, file$4, 0, 0, 0);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, svg, anchor);
+    			append_dev(svg, g);
+    			append_dev(g, line0);
+    			append_dev(g, line1);
+    		},
+    		p: noop,
+    		i: noop,
+    		o: noop,
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(svg);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$4.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$4($$self, $$props) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots("IconX", slots, []);
+    	const writable_props = [];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<IconX> was created with unknown prop '${key}'`);
+    	});
+
+    	return [];
+    }
+
+    class IconX extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$4, create_fragment$4, safe_not_equal, {});
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "IconX",
+    			options,
+    			id: create_fragment$4.name
+    		});
+    	}
+    }
+
+    /* templates\components\lightbox\Lightbox.svelte generated by Svelte v3.30.0 */
+
+    const { console: console_1 } = globals;
+    const file$5 = "templates\\components\\lightbox\\Lightbox.svelte";
+
+    function get_each_context(ctx, list, i) {
+    	const child_ctx = ctx.slice();
+    	child_ctx[44] = list[i][0];
+    	child_ctx[45] = list[i][1];
+    	child_ctx[46] = list[i][2];
+    	child_ctx[47] = list[i][3];
+    	child_ctx[48] = list[i][4];
+    	child_ctx[49] = list[i][5];
+    	return child_ctx;
+    }
+
+    // (213:0) {#if active}
+    function create_if_block(ctx) {
+    	let div8;
+    	let div0;
+    	let iconmagnify;
+    	let t0;
+    	let div1;
+    	let icondemagnify;
+    	let t1;
+    	let div2;
+    	let iconx;
+    	let t2;
+    	let div3;
+    	let iconchevronleft;
+    	let t3;
+    	let div4;
+    	let iconchevronright;
+    	let t4;
+    	let t5;
+    	let div7;
+    	let div5;
+    	let t6;
+    	let div6;
+    	let div8_class_value;
+    	let div8_intro;
+    	let div8_outro;
+    	let current;
+    	let mounted;
+    	let dispose;
+    	iconmagnify = new IconMagnify({ $$inline: true });
+    	icondemagnify = new IconDeMagnify({ $$inline: true });
+    	iconx = new IconX({ $$inline: true });
+    	iconchevronleft = new IconChevronLeft({ $$inline: true });
+    	iconchevronright = new IconChevronRight({ $$inline: true });
+    	let if_block = /*arrived*/ ctx[3] && create_if_block_1(ctx);
+
+    	const block = {
+    		c: function create() {
+    			div8 = element("div");
+    			div0 = element("div");
+    			create_component(iconmagnify.$$.fragment);
+    			t0 = space();
+    			div1 = element("div");
+    			create_component(icondemagnify.$$.fragment);
+    			t1 = space();
+    			div2 = element("div");
+    			create_component(iconx.$$.fragment);
+    			t2 = space();
+    			div3 = element("div");
+    			create_component(iconchevronleft.$$.fragment);
+    			t3 = space();
+    			div4 = element("div");
+    			create_component(iconchevronright.$$.fragment);
+    			t4 = space();
+    			if (if_block) if_block.c();
+    			t5 = space();
+    			div7 = element("div");
+    			div5 = element("div");
+    			t6 = space();
+    			div6 = element("div");
+    			div6.textContent = "Download";
+    			attr_dev(div0, "class", "icon-button magnify svelte-10pajrg");
+    			add_location(div0, file$5, 215, 4, 6913);
+    			attr_dev(div1, "class", "icon-button de-magnify svelte-10pajrg");
+    			add_location(div1, file$5, 216, 4, 6991);
+    			attr_dev(div2, "class", "icon-button close-me svelte-10pajrg");
+    			add_location(div2, file$5, 217, 4, 7075);
+    			attr_dev(div3, "class", "prior svelte-10pajrg");
+    			add_location(div3, file$5, 219, 4, 7151);
+    			attr_dev(div4, "class", "next svelte-10pajrg");
+    			add_location(div4, file$5, 220, 4, 7222);
+    			attr_dev(div5, "class", "description");
+    			add_location(div5, file$5, 249, 8, 8473);
+    			attr_dev(div6, "class", "download-button");
+    			add_location(div6, file$5, 250, 8, 8514);
+    			attr_dev(div7, "class", "description-panel svelte-10pajrg");
+    			add_location(div7, file$5, 248, 4, 8432);
+    			attr_dev(div8, "class", div8_class_value = "" + (null_to_empty(/*lightboxClass*/ ctx[10]) + " svelte-10pajrg"));
+    			add_location(div8, file$5, 213, 0, 6861);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div8, anchor);
+    			append_dev(div8, div0);
+    			mount_component(iconmagnify, div0, null);
+    			append_dev(div8, t0);
+    			append_dev(div8, div1);
+    			mount_component(icondemagnify, div1, null);
+    			append_dev(div8, t1);
+    			append_dev(div8, div2);
+    			mount_component(iconx, div2, null);
+    			append_dev(div8, t2);
+    			append_dev(div8, div3);
+    			mount_component(iconchevronleft, div3, null);
+    			append_dev(div8, t3);
+    			append_dev(div8, div4);
+    			mount_component(iconchevronright, div4, null);
+    			append_dev(div8, t4);
+    			if (if_block) if_block.m(div8, null);
+    			append_dev(div8, t5);
+    			append_dev(div8, div7);
+    			append_dev(div7, div5);
+    			append_dev(div7, t6);
+    			append_dev(div7, div6);
+    			current = true;
+
+    			if (!mounted) {
+    				dispose = [
+    					listen_dev(div0, "click", /*zoomIn*/ ctx[17], false, false, false),
+    					listen_dev(div1, "click", /*zoomOut*/ ctx[18], false, false, false),
+    					listen_dev(div2, "click", /*closeMe*/ ctx[13], false, false, false),
+    					listen_dev(div3, "click", /*showPrior*/ ctx[22], false, false, false),
+    					listen_dev(div4, "click", /*showNext*/ ctx[21], false, false, false)
+    				];
+
+    				mounted = true;
+    			}
+    		},
+    		p: function update(ctx, dirty) {
+    			if (/*arrived*/ ctx[3]) {
+    				if (if_block) {
+    					if_block.p(ctx, dirty);
+
+    					if (dirty[0] & /*arrived*/ 8) {
+    						transition_in(if_block, 1);
+    					}
+    				} else {
+    					if_block = create_if_block_1(ctx);
+    					if_block.c();
+    					transition_in(if_block, 1);
+    					if_block.m(div8, t5);
+    				}
+    			} else if (if_block) {
+    				group_outros();
+
+    				transition_out(if_block, 1, 1, () => {
+    					if_block = null;
+    				});
+
+    				check_outros();
+    			}
+
+    			if (!current || dirty[0] & /*lightboxClass*/ 1024 && div8_class_value !== (div8_class_value = "" + (null_to_empty(/*lightboxClass*/ ctx[10]) + " svelte-10pajrg"))) {
+    				attr_dev(div8, "class", div8_class_value);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(iconmagnify.$$.fragment, local);
+    			transition_in(icondemagnify.$$.fragment, local);
+    			transition_in(iconx.$$.fragment, local);
+    			transition_in(iconchevronleft.$$.fragment, local);
+    			transition_in(iconchevronright.$$.fragment, local);
+    			transition_in(if_block);
+
+    			add_render_callback(() => {
+    				if (div8_outro) div8_outro.end(1);
+    				if (!div8_intro) div8_intro = create_in_transition(div8, fade, {});
+    				div8_intro.start();
+    			});
+
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(iconmagnify.$$.fragment, local);
+    			transition_out(icondemagnify.$$.fragment, local);
+    			transition_out(iconx.$$.fragment, local);
+    			transition_out(iconchevronleft.$$.fragment, local);
+    			transition_out(iconchevronright.$$.fragment, local);
+    			transition_out(if_block);
+    			if (div8_intro) div8_intro.invalidate();
+    			div8_outro = create_out_transition(div8, fade, {});
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div8);
+    			destroy_component(iconmagnify);
+    			destroy_component(icondemagnify);
+    			destroy_component(iconx);
+    			destroy_component(iconchevronleft);
+    			destroy_component(iconchevronright);
+    			if (if_block) if_block.d();
+    			if (detaching && div8_outro) div8_outro.end();
+    			mounted = false;
+    			run_all(dispose);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_if_block.name,
+    		type: "if",
+    		source: "(213:0) {#if active}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (223:4) {#if arrived}
+    function create_if_block_1(ctx) {
+    	let div1;
+    	let div0;
+    	let t;
+    	let img;
+    	let img_src_value;
+    	let div1_intro;
+    	let div1_outro;
+    	let current;
+    	let mounted;
+    	let dispose;
+    	let if_block = !/*loaded*/ ctx[0] && create_if_block_2(ctx);
+
+    	const block = {
+    		c: function create() {
+    			div1 = element("div");
+    			div0 = element("div");
+    			if (if_block) if_block.c();
+    			t = space();
+    			img = element("img");
+    			if (img.src !== (img_src_value = /*src*/ ctx[5])) attr_dev(img, "src", img_src_value);
+    			attr_dev(img, "srcset", /*srcset*/ ctx[6]);
+    			attr_dev(img, "alt", /*alt*/ ctx[4]);
+    			attr_dev(img, "class", "svelte-10pajrg");
+    			add_location(img, file$5, 243, 12, 8293);
+    			attr_dev(div0, "class", "photo svelte-10pajrg");
+    			attr_dev(div0, "style", /*photoScale*/ ctx[12]);
+    			add_location(div0, file$5, 224, 8, 7372);
+    			attr_dev(div1, "class", "photo-frame svelte-10pajrg");
+    			add_location(div1, file$5, 223, 4, 7313);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div1, anchor);
+    			append_dev(div1, div0);
+    			if (if_block) if_block.m(div0, null);
+    			append_dev(div0, t);
+    			append_dev(div0, img);
+    			/*img_binding*/ ctx[33](img);
+    			current = true;
+
+    			if (!mounted) {
+    				dispose = listen_dev(img, "load", /*onImageLoad*/ ctx[14], false, false, false);
+    				mounted = true;
+    			}
+    		},
+    		p: function update(ctx, dirty) {
+    			if (!/*loaded*/ ctx[0]) {
+    				if (if_block) {
+    					if_block.p(ctx, dirty);
+
+    					if (dirty[0] & /*loaded*/ 1) {
+    						transition_in(if_block, 1);
+    					}
+    				} else {
+    					if_block = create_if_block_2(ctx);
+    					if_block.c();
+    					transition_in(if_block, 1);
+    					if_block.m(div0, t);
+    				}
+    			} else if (if_block) {
+    				group_outros();
+
+    				transition_out(if_block, 1, 1, () => {
+    					if_block = null;
+    				});
+
+    				check_outros();
+    			}
+
+    			if (!current || dirty[0] & /*src*/ 32 && img.src !== (img_src_value = /*src*/ ctx[5])) {
+    				attr_dev(img, "src", img_src_value);
+    			}
+
+    			if (!current || dirty[0] & /*srcset*/ 64) {
+    				attr_dev(img, "srcset", /*srcset*/ ctx[6]);
+    			}
+
+    			if (!current || dirty[0] & /*alt*/ 16) {
+    				attr_dev(img, "alt", /*alt*/ ctx[4]);
+    			}
+
+    			if (!current || dirty[0] & /*photoScale*/ 4096) {
+    				attr_dev(div0, "style", /*photoScale*/ ctx[12]);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(if_block);
+
+    			add_render_callback(() => {
+    				if (div1_outro) div1_outro.end(1);
+    				if (!div1_intro) div1_intro = create_in_transition(div1, /*slideIn*/ ctx[20], {});
+    				div1_intro.start();
+    			});
+
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(if_block);
+    			if (div1_intro) div1_intro.invalidate();
+    			div1_outro = create_out_transition(div1, /*slideOut*/ ctx[19], {});
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div1);
+    			if (if_block) if_block.d();
+    			/*img_binding*/ ctx[33](null);
+    			if (detaching && div1_outro) div1_outro.end();
+    			mounted = false;
+    			dispose();
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_if_block_1.name,
+    		type: "if",
+    		source: "(223:4) {#if arrived}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (227:12) {#if !loaded}
+    function create_if_block_2(ctx) {
+    	let div;
+    	let svg;
+    	let g;
+    	let svg_viewBox_value;
+    	let div_class_value;
+    	let div_outro;
+    	let current;
+    	let if_block = !/*loaded*/ ctx[0] && create_if_block_3(ctx);
+    	let each_value = /*svgSequence*/ ctx[7];
+    	validate_each_argument(each_value);
+    	let each_blocks = [];
+
+    	for (let i = 0; i < each_value.length; i += 1) {
+    		each_blocks[i] = create_each_block(get_each_context(ctx, each_value, i));
+    	}
+
+    	const block = {
+    		c: function create() {
+    			div = element("div");
+    			svg = svg_element("svg");
+    			if (if_block) if_block.c();
+    			g = svg_element("g");
+
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				each_blocks[i].c();
+    			}
+
+    			add_location(g, file$5, 234, 24, 7931);
+    			attr_dev(svg, "xmlns", "http://www.w3.org/2000/svg");
+    			attr_dev(svg, "version", "1.1");
+    			attr_dev(svg, "width", "100%");
+    			attr_dev(svg, "height", "100%");
+    			attr_dev(svg, "viewBox", svg_viewBox_value = "0 0 " + /*svgWidth*/ ctx[9] + " " + /*svgHeight*/ ctx[8]);
+    			attr_dev(svg, "class", "svelte-10pajrg");
+    			add_location(svg, file$5, 228, 20, 7527);
+    			attr_dev(div, "class", div_class_value = "" + (null_to_empty(/*photoSvgClass*/ ctx[11]) + " svelte-10pajrg"));
+    			add_location(div, file$5, 227, 16, 7457);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div, anchor);
+    			append_dev(div, svg);
+    			if (if_block) if_block.m(svg, null);
+    			append_dev(svg, g);
+
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				each_blocks[i].m(g, null);
+    			}
+
+    			current = true;
+    		},
+    		p: function update(new_ctx, dirty) {
+    			ctx = new_ctx;
+
+    			if (!/*loaded*/ ctx[0]) {
+    				if (if_block) {
+    					if_block.p(ctx, dirty);
+
+    					if (dirty[0] & /*loaded*/ 1) {
+    						transition_in(if_block, 1);
+    					}
+    				} else {
+    					if_block = create_if_block_3(ctx);
+    					if_block.c();
+    					transition_in(if_block, 1);
+    					if_block.m(svg, g);
+    				}
+    			} else if (if_block) {
+    				group_outros();
+
+    				transition_out(if_block, 1, 1, () => {
+    					if_block = null;
+    				});
+
+    				check_outros();
+    			}
+
+    			if (dirty[0] & /*svgSequence*/ 128) {
+    				each_value = /*svgSequence*/ ctx[7];
+    				validate_each_argument(each_value);
+    				let i;
+
+    				for (i = 0; i < each_value.length; i += 1) {
+    					const child_ctx = get_each_context(ctx, each_value, i);
+
+    					if (each_blocks[i]) {
+    						each_blocks[i].p(child_ctx, dirty);
+    					} else {
+    						each_blocks[i] = create_each_block(child_ctx);
+    						each_blocks[i].c();
+    						each_blocks[i].m(g, null);
+    					}
+    				}
+
+    				for (; i < each_blocks.length; i += 1) {
+    					each_blocks[i].d(1);
+    				}
+
+    				each_blocks.length = each_value.length;
+    			}
+
+    			if (!current || dirty[0] & /*svgWidth, svgHeight*/ 768 && svg_viewBox_value !== (svg_viewBox_value = "0 0 " + /*svgWidth*/ ctx[9] + " " + /*svgHeight*/ ctx[8])) {
+    				attr_dev(svg, "viewBox", svg_viewBox_value);
+    			}
+
+    			if (!current || dirty[0] & /*photoSvgClass*/ 2048 && div_class_value !== (div_class_value = "" + (null_to_empty(/*photoSvgClass*/ ctx[11]) + " svelte-10pajrg"))) {
+    				attr_dev(div, "class", div_class_value);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(if_block);
+    			if (div_outro) div_outro.end(1);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(if_block);
+    			div_outro = create_out_transition(div, fade, /*fadeSlow*/ ctx[15]);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div);
+    			if (if_block) if_block.d();
+    			destroy_each(each_blocks, detaching);
+    			if (detaching && div_outro) div_outro.end();
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_if_block_2.name,
+    		type: "if",
+    		source: "(227:12) {#if !loaded}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (231:24) {#if !loaded}
+    function create_if_block_3(ctx) {
+    	let rect;
+    	let rect_outro;
+    	let current;
+
+    	const block = {
+    		c: function create() {
+    			rect = svg_element("rect");
+    			attr_dev(rect, "x", "0");
+    			attr_dev(rect, "y", "0");
+    			attr_dev(rect, "width", /*svgWidth*/ ctx[9]);
+    			attr_dev(rect, "height", /*svgHeight*/ ctx[8]);
+    			attr_dev(rect, "fill", "#f0f0f0");
+    			add_location(rect, file$5, 231, 28, 7749);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, rect, anchor);
+    			current = true;
+    		},
+    		p: function update(new_ctx, dirty) {
+    			ctx = new_ctx;
+
+    			if (!current || dirty[0] & /*svgWidth*/ 512) {
+    				attr_dev(rect, "width", /*svgWidth*/ ctx[9]);
+    			}
+
+    			if (!current || dirty[0] & /*svgHeight*/ 256) {
+    				attr_dev(rect, "height", /*svgHeight*/ ctx[8]);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			if (rect_outro) rect_outro.end(1);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			rect_outro = create_out_transition(rect, fade, /*fadeQuick*/ ctx[16]);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(rect);
+    			if (detaching && rect_outro) rect_outro.end();
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_if_block_3.name,
+    		type: "if",
+    		source: "(231:24) {#if !loaded}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (236:28) {#each svgSequence as [ fill, opacity, cx, cy, rx, ry ] }
+    function create_each_block(ctx) {
+    	let ellipse;
+    	let ellipse_fill_value;
+    	let ellipse_fill_opacity_value;
+    	let ellipse_cx_value;
+    	let ellipse_cy_value;
+    	let ellipse_rx_value;
+    	let ellipse_ry_value;
+
+    	const block = {
+    		c: function create() {
+    			ellipse = svg_element("ellipse");
+    			attr_dev(ellipse, "fill", ellipse_fill_value = /*fill*/ ctx[44]);
+    			attr_dev(ellipse, "fill-opacity", ellipse_fill_opacity_value = /*opacity*/ ctx[45]);
+    			attr_dev(ellipse, "cx", ellipse_cx_value = /*cx*/ ctx[46]);
+    			attr_dev(ellipse, "cy", ellipse_cy_value = /*cy*/ ctx[47]);
+    			attr_dev(ellipse, "rx", ellipse_rx_value = /*rx*/ ctx[48]);
+    			attr_dev(ellipse, "ry", ellipse_ry_value = /*ry*/ ctx[49]);
+    			add_location(ellipse, file$5, 236, 32, 8055);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, ellipse, anchor);
+    		},
+    		p: function update(ctx, dirty) {
+    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_fill_value !== (ellipse_fill_value = /*fill*/ ctx[44])) {
+    				attr_dev(ellipse, "fill", ellipse_fill_value);
+    			}
+
+    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_fill_opacity_value !== (ellipse_fill_opacity_value = /*opacity*/ ctx[45])) {
+    				attr_dev(ellipse, "fill-opacity", ellipse_fill_opacity_value);
+    			}
+
+    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_cx_value !== (ellipse_cx_value = /*cx*/ ctx[46])) {
+    				attr_dev(ellipse, "cx", ellipse_cx_value);
+    			}
+
+    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_cy_value !== (ellipse_cy_value = /*cy*/ ctx[47])) {
+    				attr_dev(ellipse, "cy", ellipse_cy_value);
+    			}
+
+    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_rx_value !== (ellipse_rx_value = /*rx*/ ctx[48])) {
+    				attr_dev(ellipse, "rx", ellipse_rx_value);
+    			}
+
+    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_ry_value !== (ellipse_ry_value = /*ry*/ ctx[49])) {
+    				attr_dev(ellipse, "ry", ellipse_ry_value);
+    			}
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(ellipse);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_each_block.name,
+    		type: "each",
+    		source: "(236:28) {#each svgSequence as [ fill, opacity, cx, cy, rx, ry ] }",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function create_fragment$5(ctx) {
+    	let if_block_anchor;
+    	let current;
+    	let if_block = /*active*/ ctx[1] && create_if_block(ctx);
+
+    	const block = {
+    		c: function create() {
+    			if (if_block) if_block.c();
+    			if_block_anchor = empty();
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			if (if_block) if_block.m(target, anchor);
+    			insert_dev(target, if_block_anchor, anchor);
+    			current = true;
+    		},
+    		p: function update(ctx, dirty) {
+    			if (/*active*/ ctx[1]) {
+    				if (if_block) {
+    					if_block.p(ctx, dirty);
+
+    					if (dirty[0] & /*active*/ 2) {
+    						transition_in(if_block, 1);
+    					}
+    				} else {
+    					if_block = create_if_block(ctx);
+    					if_block.c();
+    					transition_in(if_block, 1);
+    					if_block.m(if_block_anchor.parentNode, if_block_anchor);
+    				}
+    			} else if (if_block) {
+    				group_outros();
+
+    				transition_out(if_block, 1, 1, () => {
+    					if_block = null;
+    				});
+
+    				check_outros();
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(if_block);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(if_block);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (if_block) if_block.d(detaching);
+    			if (detaching) detach_dev(if_block_anchor);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$5.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$5($$self, $$props, $$invalidate) {
     	let $GalleryStore;
     	validate_store(GalleryStore, "GalleryStore");
-    	component_subscribe($$self, GalleryStore, $$value => $$invalidate(0, $GalleryStore = $$value));
+    	component_subscribe($$self, GalleryStore, $$value => $$invalidate(24, $GalleryStore = $$value));
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots("Lightbox", slots, []);
+    	let loaded = false;
+    	let slideDirection = "";
+
+    	// let scale = 1;
+    	let imgEl;
+
+    	let zoomer;
+    	const srcSizes = [["tiny", "400w"], ["small", "600w"], ["medium", "1180w"], ["large", "1700w"]];
+    	const getSrcSizes = fileName => ([size, width]) => getSizedPath(size, fileName) + " " + width;
+
+    	const closeMe = () => {
+    		slideDirection = "";
+    		$$invalidate(0, loaded = false);
+
+    		// scale = 1;
+    		if (zoomer) {
+    			zoomer.destroy();
+    			$$invalidate(23, zoomer = null);
+    		}
+
+    		GalleryStore.closeLightbox();
+    	};
+
+    	const onImageLoad = () => {
+    		console.log("lightbox loaded?", loaded);
+    		$$invalidate(0, loaded = true);
+
+    		if (!zoomer) {
+    			const zoomProps = {
+    				minScale: 1,
+    				maxScale: 5,
+    				speed: 10,
+    				dragScrollableOptions: { smoothExtinction: true },
+    				zoomOnClick: false
+    			}; // width: workingWidth,
+    			// height: workingHeight
+
+    			$$invalidate(23, zoomer = WZoom.create(imgEl, zoomProps));
+    			console.log("zoomer!", zoomer);
+    		}
+    	};
+
+    	const fadeSlow = { delay: 200, duration: 600 };
+    	const fadeQuick = { delay: 100, duration: 300 };
+
+    	const composeScale = (height, width) => {
+    		const ratio = height / width;
+
+    		if (ratio > 1) {
+    			return "width:" + (getDocHeight() / ratio).toFixed(1) + "px; " + "height:" + getDocHeight() + "px;";
+    		}
+
+    		return "width:" + getDocWidth() + "px; " + "height:" + (getDocWidth() * ratio).toFixed(1) + "px;";
+    	};
+
+    	const calcHeight = data => {
+    		const { width, height } = data;
+    		const ratio = height / width;
+
+    		if (ratio > 1) {
+    			return getDocHeight() + "px";
+    		}
+
+    		return (getDocWidth() * ratio).toFixed(1) + "px";
+    	};
+
+    	const calcWidth = data => {
+    		const { width, height } = data;
+    		const ratio = height / width;
+
+    		if (ratio > 1) {
+    			return (getDocHeight() / ratio).toFixed(1) + "px";
+    		}
+
+    		return getDocWidth() + "px";
+    	};
+
+    	const reset = () => {
+    		$$invalidate(0, loaded = false);
+    	};
+
+    	const zoomIn = () => {
+    		if (zoomer) {
+    			zoomer.zoomUp();
+    		}
+    	}; // scale = (scale * 1.33 >= 5 ? 5 : scale * 1.33);
+    	// photoScale = composeScale(height, width, scale);
+
+    	const zoomOut = () => {
+    		if (zoomer) {
+    			zoomer.zoomDown();
+    		}
+    	}; // scale = (scale * 0.7 <= 1 ? 1 : scale * 0.7);
+    	// photoScale = composeScale(height, width, scale);
+
+    	function slideOut(node, { delay = 0, duration = 150 }) {
+    		return {
+    			delay,
+    			duration,
+    			css: t => {
+    				if (!slideDirection) {
+    					return "";
+    				}
+
+    				const direction = slideDirection === "forward" ? 1 : -1;
+    				const eased = sineOut(t);
+    				return `transform: translate(${direction * (-105 + eased * 105)}%, 0)`;
+    			}
+    		};
+    	}
+
+    	function slideIn(node, { delay = 0, duration = 350 }) {
+    		return {
+    			delay,
+    			duration,
+    			css: t => {
+    				if (!slideDirection) {
+    					return "";
+    				}
+
+    				const direction = slideDirection === "forward" ? 1 : -1;
+    				const eased = sineOut(t);
+    				return `transform: translate(${direction * (105 - eased * 105)}%, 0)`;
+    			}
+    		};
+    	}
+
+    	const showNext = () => {
+    		slideDirection = "forward";
+
+    		if (zoomer) {
+    			zoomer.destroy();
+    			$$invalidate(23, zoomer = null);
+    		}
+
+    		$$invalidate(3, arrived = false);
+
+    		const nextIndex = currentIndex === $GalleryStore.images.length - 1
+    		? 0
+    		: currentIndex + 1;
+
+    		const nextFileName = $GalleryStore.images[nextIndex].fileName;
+
+    		setTimeout(
+    			() => {
+    				$$invalidate(0, loaded = false);
+    				GalleryStore.viewLightbox(nextFileName);
+
+    				setTimeout(
+    					() => {
+    						if (zoomer) {
+    							zoomer.prepare();
+    						}
+    					},
+    					400
+    				);
+    			},
+    			140
+    		);
+    	};
+
+    	const showPrior = () => {
+    		slideDirection = "previous";
+
+    		if (zoomer) {
+    			zoomer.destroy();
+    			$$invalidate(23, zoomer = null);
+    		}
+
+    		$$invalidate(3, arrived = false);
+
+    		const priorIndex = currentIndex === 0
+    		? $GalleryStore.images.length - 1
+    		: currentIndex - 1;
+
+    		const priorFileName = $GalleryStore.images[priorIndex].fileName;
+
+    		setTimeout(
+    			() => {
+    				$$invalidate(0, loaded = false);
+    				GalleryStore.viewLightbox(priorFileName);
+
+    				setTimeout(
+    					() => {
+    						if (zoomer) {
+    							zoomer.prepare();
+    						}
+    					},
+    					400
+    				);
+    			},
+    			140
+    		);
+    	};
+
+    	onMount(reset);
+    	const writable_props = [];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console_1.warn(`<Lightbox> was created with unknown prop '${key}'`);
+    	});
+
+    	function img_binding($$value) {
+    		binding_callbacks[$$value ? "unshift" : "push"](() => {
+    			imgEl = $$value;
+    			$$invalidate(2, imgEl);
+    		});
+    	}
+
+    	$$self.$capture_state = () => ({
+    		onMount,
+    		fade,
+    		sineOut,
+    		GalleryStore,
+    		getSizedPath,
+    		getDocHeight,
+    		getDocWidth,
+    		dummyImage,
+    		WZoom,
+    		IconMagnify,
+    		IconDeMagnify,
+    		IconChevronLeft,
+    		IconChevronRight,
+    		IconX,
+    		loaded,
+    		slideDirection,
+    		imgEl,
+    		zoomer,
+    		srcSizes,
+    		getSrcSizes,
+    		closeMe,
+    		onImageLoad,
+    		fadeSlow,
+    		fadeQuick,
+    		composeScale,
+    		calcHeight,
+    		calcWidth,
+    		reset,
+    		zoomIn,
+    		zoomOut,
+    		slideOut,
+    		slideIn,
+    		showNext,
+    		showPrior,
+    		active,
+    		$GalleryStore,
+    		current,
+    		arrived,
+    		currentIndex,
+    		imgData,
+    		data,
+    		fileName,
+    		width,
+    		height,
+    		ratio,
+    		workingHeight,
+    		workingWidth,
+    		photoClass,
+    		alt,
+    		src,
+    		srcset,
+    		svgSequence,
+    		svgHeight,
+    		svgWidth,
+    		lightboxClass,
+    		photoSvgClass,
+    		photoScale
+    	});
+
+    	$$self.$inject_state = $$props => {
+    		if ("loaded" in $$props) $$invalidate(0, loaded = $$props.loaded);
+    		if ("slideDirection" in $$props) slideDirection = $$props.slideDirection;
+    		if ("imgEl" in $$props) $$invalidate(2, imgEl = $$props.imgEl);
+    		if ("zoomer" in $$props) $$invalidate(23, zoomer = $$props.zoomer);
+    		if ("active" in $$props) $$invalidate(1, active = $$props.active);
+    		if ("current" in $$props) $$invalidate(25, current = $$props.current);
+    		if ("arrived" in $$props) $$invalidate(3, arrived = $$props.arrived);
+    		if ("currentIndex" in $$props) $$invalidate(26, currentIndex = $$props.currentIndex);
+    		if ("imgData" in $$props) $$invalidate(27, imgData = $$props.imgData);
+    		if ("data" in $$props) $$invalidate(28, data = $$props.data);
+    		if ("fileName" in $$props) $$invalidate(29, fileName = $$props.fileName);
+    		if ("width" in $$props) $$invalidate(30, width = $$props.width);
+    		if ("height" in $$props) $$invalidate(31, height = $$props.height);
+    		if ("ratio" in $$props) $$invalidate(32, ratio = $$props.ratio);
+    		if ("workingHeight" in $$props) workingHeight = $$props.workingHeight;
+    		if ("workingWidth" in $$props) workingWidth = $$props.workingWidth;
+    		if ("photoClass" in $$props) photoClass = $$props.photoClass;
+    		if ("alt" in $$props) $$invalidate(4, alt = $$props.alt);
+    		if ("src" in $$props) $$invalidate(5, src = $$props.src);
+    		if ("srcset" in $$props) $$invalidate(6, srcset = $$props.srcset);
+    		if ("svgSequence" in $$props) $$invalidate(7, svgSequence = $$props.svgSequence);
+    		if ("svgHeight" in $$props) $$invalidate(8, svgHeight = $$props.svgHeight);
+    		if ("svgWidth" in $$props) $$invalidate(9, svgWidth = $$props.svgWidth);
+    		if ("lightboxClass" in $$props) $$invalidate(10, lightboxClass = $$props.lightboxClass);
+    		if ("photoSvgClass" in $$props) $$invalidate(11, photoSvgClass = $$props.photoSvgClass);
+    		if ("photoScale" in $$props) $$invalidate(12, photoScale = $$props.photoScale);
+    	};
+
+    	let active;
+    	let current;
+    	let arrived;
+    	let currentIndex;
+    	let imgData;
+    	let data;
+    	let fileName;
+    	let width;
+    	let height;
+    	let ratio;
+    	let workingHeight;
+    	let workingWidth;
+    	let photoClass;
+    	let alt;
+    	let src;
+    	let srcset;
+    	let svgSequence;
+    	let svgHeight;
+    	let svgWidth;
+    	let lightboxClass;
+    	let photoSvgClass;
+    	let photoScale;
+
+    	if ($$props && "$$inject" in $$props) {
+    		$$self.$inject_state($$props.$$inject);
+    	}
+
+    	$$self.$$.update = () => {
+    		if ($$self.$$.dirty[0] & /*$GalleryStore*/ 16777216) {
+    			 $$invalidate(1, active = $GalleryStore.active);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*$GalleryStore*/ 16777216) {
+    			 $$invalidate(25, current = $GalleryStore.current);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*$GalleryStore*/ 16777216) {
+    			 $$invalidate(3, arrived = $GalleryStore.active);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*$GalleryStore, current*/ 50331648) {
+    			 $$invalidate(26, currentIndex = $GalleryStore.images.findIndex(next => next.fileName === current));
+    		}
+
+    		if ($$self.$$.dirty[0] & /*$GalleryStore, currentIndex*/ 83886080) {
+    			 $$invalidate(27, imgData = $GalleryStore.images[currentIndex]);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*imgData*/ 134217728) {
+    			 $$invalidate(28, data = imgData || dummyImage);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
+    			 $$invalidate(29, fileName = data.fileName);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
+    			 $$invalidate(30, width = data.width);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
+    			 $$invalidate(31, height = data.height);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*width*/ 1073741824 | $$self.$$.dirty[1] & /*height*/ 1) {
+    			 $$invalidate(32, ratio = height / width);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
+    			 workingHeight = calcHeight(data);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
+    			 workingWidth = calcWidth(data);
+    		}
+
+    		if ($$self.$$.dirty[1] & /*ratio*/ 2) {
+    			 photoClass = "photo " + (ratio > 1 ? "tall" : ratio < 1 ? "wide" : "square");
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
+    			 $$invalidate(4, alt = data.description ? data.height.slice(0, 10) : "image");
+    		}
+
+    		if ($$self.$$.dirty[0] & /*active, fileName*/ 536870914) {
+    			 $$invalidate(5, src = active ? getSizedPath("small", fileName) : "");
+    		}
+
+    		if ($$self.$$.dirty[0] & /*active, zoomer, fileName*/ 545259522) {
+    			 $$invalidate(6, srcset = !active
+    			? ""
+    			: Boolean(zoomer)
+    				? getSizedPath("large", fileName) + " 300w"
+    				: srcSizes.map(getSrcSizes(fileName)).join(","));
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
+    			 $$invalidate(7, svgSequence = data.svgSequence);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
+    			 $$invalidate(8, svgHeight = data.svgHeight);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
+    			 $$invalidate(9, svgWidth = data.svgWidth);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*active*/ 2) {
+    			 $$invalidate(10, lightboxClass = "lightbox" + (active ? " active" : ""));
+    		}
+
+    		if ($$self.$$.dirty[0] & /*loaded*/ 1) {
+    			 $$invalidate(11, photoSvgClass = "photo-svg" + (loaded ? " image-loaded" : ""));
+    		}
+
+    		if ($$self.$$.dirty[0] & /*width*/ 1073741824 | $$self.$$.dirty[1] & /*height*/ 1) {
+    			 $$invalidate(12, photoScale = composeScale(height, width));
+    		}
+    	};
+
+    	return [
+    		loaded,
+    		active,
+    		imgEl,
+    		arrived,
+    		alt,
+    		src,
+    		srcset,
+    		svgSequence,
+    		svgHeight,
+    		svgWidth,
+    		lightboxClass,
+    		photoSvgClass,
+    		photoScale,
+    		closeMe,
+    		onImageLoad,
+    		fadeSlow,
+    		fadeQuick,
+    		zoomIn,
+    		zoomOut,
+    		slideOut,
+    		slideIn,
+    		showNext,
+    		showPrior,
+    		zoomer,
+    		$GalleryStore,
+    		current,
+    		currentIndex,
+    		imgData,
+    		data,
+    		fileName,
+    		width,
+    		height,
+    		ratio,
+    		img_binding
+    	];
+    }
+
+    class Lightbox extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$5, create_fragment$5, safe_not_equal, {}, [-1, -1]);
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "Lightbox",
+    			options,
+    			id: create_fragment$5.name
+    		});
+    	}
+    }
+
+    function flip(node, animation, params) {
+        const style = getComputedStyle(node);
+        const transform = style.transform === 'none' ? '' : style.transform;
+        const scaleX = animation.from.width / node.clientWidth;
+        const scaleY = animation.from.height / node.clientHeight;
+        const dx = (animation.from.left - animation.to.left) / scaleX;
+        const dy = (animation.from.top - animation.to.top) / scaleY;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        const { delay = 0, duration = (d) => Math.sqrt(d) * 120, easing = cubicOut } = params;
+        return {
+            delay,
+            duration: is_function(duration) ? duration(d) : duration,
+            easing,
+            css: (_t, u) => `transform: ${transform} translate(${u * dx}px, ${u * dy}px);`
+        };
+    }
+
+    // external events
+    const FINALIZE_EVENT_NAME = "finalize";
+    const CONSIDER_EVENT_NAME = "consider";
+
+    /**
+     * @typedef {Object} Info
+     * @property {string} trigger
+     * @property {string} id
+     * @property {string} source
+     * @param {Node} el
+     * @param {Array} items
+     * @param {Info} info
+     */
+    function dispatchFinalizeEvent(el, items, info) {
+        el.dispatchEvent(
+            new CustomEvent(FINALIZE_EVENT_NAME, {
+                detail: {items, info}
+            })
+        );
+    }
+
+    /**
+     * Dispatches a consider event
+     * @param {Node} el
+     * @param {Array} items
+     * @param {Info} info
+     */
+    function dispatchConsiderEvent(el, items, info) {
+        el.dispatchEvent(
+            new CustomEvent(CONSIDER_EVENT_NAME, {
+                detail: {items, info}
+            })
+        );
+    }
+
+    // internal events
+    const DRAGGED_ENTERED_EVENT_NAME = "draggedEntered";
+    const DRAGGED_LEFT_EVENT_NAME = "draggedLeft";
+    const DRAGGED_OVER_INDEX_EVENT_NAME = "draggedOverIndex";
+    const DRAGGED_LEFT_DOCUMENT_EVENT_NAME = "draggedLeftDocument";
+    function dispatchDraggedElementEnteredContainer(containerEl, indexObj, draggedEl) {
+        containerEl.dispatchEvent(
+            new CustomEvent(DRAGGED_ENTERED_EVENT_NAME, {
+                detail: {indexObj, draggedEl}
+            })
+        );
+    }
+    function dispatchDraggedElementLeftContainer(containerEl, draggedEl) {
+        containerEl.dispatchEvent(
+            new CustomEvent(DRAGGED_LEFT_EVENT_NAME, {
+                detail: {draggedEl}
+            })
+        );
+    }
+    function dispatchDraggedElementIsOverIndex(containerEl, indexObj, draggedEl) {
+        containerEl.dispatchEvent(
+            new CustomEvent(DRAGGED_OVER_INDEX_EVENT_NAME, {
+                detail: {indexObj, draggedEl}
+            })
+        );
+    }
+    function dispatchDraggedLeftDocument(draggedEl) {
+        window.dispatchEvent(
+            new CustomEvent(DRAGGED_LEFT_DOCUMENT_EVENT_NAME, {
+                detail: {draggedEl}
+            })
+        );
+    }
+
+    const TRIGGERS = {
+        DRAG_STARTED: "dragStarted",
+        DRAGGED_ENTERED: DRAGGED_ENTERED_EVENT_NAME,
+        DRAGGED_OVER_INDEX: DRAGGED_OVER_INDEX_EVENT_NAME,
+        DRAGGED_LEFT: DRAGGED_LEFT_EVENT_NAME,
+        DROPPED_INTO_ZONE: "droppedIntoZone",
+        DROPPED_INTO_ANOTHER: "droppedIntoAnother",
+        DROPPED_OUTSIDE_OF_ANY: "droppedOutsideOfAny",
+        DRAG_STOPPED: "dragStopped"
+    };
+    const SOURCES = {
+        POINTER: "pointer",
+        KEYBOARD: "keyboard"
+    };
+
+    const SHADOW_ITEM_MARKER_PROPERTY_NAME = "isDndShadowItem";
+    let ITEM_ID_KEY = "id";
+    let activeDndZoneCount = 0;
+    function incrementActiveDropZoneCount() {
+        activeDndZoneCount++;
+    }
+    function decrementActiveDropZoneCount() {
+        if (activeDndZoneCount === 0) {
+            throw new Error("Bug! trying to decrement when there are no dropzones");
+        }
+        activeDndZoneCount--;
+    }
+
+    const isOnServer = typeof window === "undefined";
+
+    // This is based off https://stackoverflow.com/questions/27745438/how-to-compute-getboundingclientrect-without-considering-transforms/57876601#57876601
+    // It removes the transforms that are potentially applied by the flip animations
+    function adjustedBoundingRect(el) {
+        let ta;
+        const rect = el.getBoundingClientRect();
+        const style = getComputedStyle(el);
+        const tx = style.transform;
+
+        if (tx) {
+            let sx, sy, dx, dy;
+            if (tx.startsWith("matrix3d(")) {
+                ta = tx.slice(9, -1).split(/, /);
+                sx = +ta[0];
+                sy = +ta[5];
+                dx = +ta[12];
+                dy = +ta[13];
+            } else if (tx.startsWith("matrix(")) {
+                ta = tx.slice(7, -1).split(/, /);
+                sx = +ta[0];
+                sy = +ta[3];
+                dx = +ta[4];
+                dy = +ta[5];
+            } else {
+                return rect;
+            }
+
+            const to = style.transformOrigin;
+            const x = rect.x - dx - (1 - sx) * parseFloat(to);
+            const y = rect.y - dy - (1 - sy) * parseFloat(to.slice(to.indexOf(" ") + 1));
+            const w = sx ? rect.width / sx : el.offsetWidth;
+            const h = sy ? rect.height / sy : el.offsetHeight;
+            return {
+                x: x,
+                y: y,
+                width: w,
+                height: h,
+                top: y,
+                right: x + w,
+                bottom: y + h,
+                left: x
+            };
+        } else {
+            return rect;
+        }
+    }
+
+    /**
+     * Gets the absolute bounding rect (accounts for the window's scroll position and removes transforms)
+     * @param {HTMLElement} el
+     * @return {{top: number, left: number, bottom: number, right: number}}
+     */
+    function getAbsoluteRectNoTransforms(el) {
+        const rect = adjustedBoundingRect(el);
+        return {
+            top: rect.top + window.scrollY,
+            bottom: rect.bottom + window.scrollY,
+            left: rect.left + window.scrollX,
+            right: rect.right + window.scrollX
+        };
+    }
+
+    /**
+     * Gets the absolute bounding rect (accounts for the window's scroll position)
+     * @param {HTMLElement} el
+     * @return {{top: number, left: number, bottom: number, right: number}}
+     */
+    function getAbsoluteRect(el) {
+        const rect = el.getBoundingClientRect();
+        return {
+            top: rect.top + window.scrollY,
+            bottom: rect.bottom + window.scrollY,
+            left: rect.left + window.scrollX,
+            right: rect.right + window.scrollX
+        };
+    }
+
+    /**
+     * finds the center :)
+     * @typedef {Object} Rect
+     * @property {number} top
+     * @property {number} bottom
+     * @property {number} left
+     * @property {number} right
+     * @param {Rect} rect
+     * @return {{x: number, y: number}}
+     */
+    function findCenter(rect) {
+        return {
+            x: (rect.left + rect.right) / 2,
+            y: (rect.top + rect.bottom) / 2
+        };
+    }
+
+    /**
+     * @typedef {Object} Point
+     * @property {number} x
+     * @property {number} y
+     * @param {Point} pointA
+     * @param {Point} pointB
+     * @return {number}
+     */
+    function calcDistance(pointA, pointB) {
+        return Math.sqrt(Math.pow(pointA.x - pointB.x, 2) + Math.pow(pointA.y - pointB.y, 2));
+    }
+
+    /**
+     * @param {Point} point
+     * @param {Rect} rect
+     * @return {boolean|boolean}
+     */
+    function isPointInsideRect(point, rect) {
+        return point.y <= rect.bottom && point.y >= rect.top && point.x >= rect.left && point.x <= rect.right;
+    }
+
+    /**
+     * find the absolute coordinates of the center of a dom element
+     * @param el {HTMLElement}
+     * @returns {{x: number, y: number}}
+     */
+    function findCenterOfElement(el) {
+        return findCenter(getAbsoluteRect(el));
+    }
+
+    /**
+     * @param {HTMLElement} elA
+     * @param {HTMLElement} elB
+     * @return {boolean}
+     */
+    function isCenterOfAInsideB(elA, elB) {
+        const centerOfA = findCenterOfElement(elA);
+        const rectOfB = getAbsoluteRectNoTransforms(elB);
+        return isPointInsideRect(centerOfA, rectOfB);
+    }
+
+    /**
+     * @param {HTMLElement|ChildNode} elA
+     * @param {HTMLElement|ChildNode} elB
+     * @return {number}
+     */
+    function calcDistanceBetweenCenters(elA, elB) {
+        const centerOfA = findCenterOfElement(elA);
+        const centerOfB = findCenterOfElement(elB);
+        return calcDistance(centerOfA, centerOfB);
+    }
+
+    /**
+     * @param {HTMLElement} el - the element to check
+     * @returns {boolean} - true if the element in its entirety is off screen including the scrollable area (the normal dom events look at the mouse rather than the element)
+     */
+    function isElementOffDocument(el) {
+        const rect = getAbsoluteRect(el);
+        return rect.right < 0 || rect.left > document.documentElement.scrollWidth || rect.bottom < 0 || rect.top > document.documentElement.scrollHeight;
+    }
+
+    /**
+     * If the point is inside the element returns its distances from the sides, otherwise returns null
+     * @param {Point} point
+     * @param {HTMLElement} el
+     * @return {null|{top: number, left: number, bottom: number, right: number}}
+     */
+    function calcInnerDistancesBetweenPointAndSidesOfElement(point, el) {
+        const rect = getAbsoluteRect(el);
+        if (!isPointInsideRect(point, rect)) {
+            return null;
+        }
+        return {
+            top: point.y - rect.top,
+            bottom: rect.bottom - point.y,
+            left: point.x - rect.left,
+            // TODO - figure out what is so special about right (why the rect is too big)
+            right: Math.min(rect.right, document.documentElement.clientWidth) - point.x
+        };
+    }
+
+    /**
+     * @typedef {Object} Index
+     * @property {number} index - the would be index
+     * @property {boolean} isProximityBased - false if the element is actually over the index, true if it is not over it but this index is the closest
+     */
+    /**
+     * Find the index for the dragged element in the list it is dragged over
+     * @param {HTMLElement} floatingAboveEl
+     * @param {HTMLElement} collectionBelowEl
+     * @returns {Index|null} -  if the element is over the container the Index object otherwise null
+     */
+    function findWouldBeIndex(floatingAboveEl, collectionBelowEl) {
+        if (!isCenterOfAInsideB(floatingAboveEl, collectionBelowEl)) {
+            return null;
+        }
+        const children = collectionBelowEl.children;
+        // the container is empty, floating element should be the first
+        if (children.length === 0) {
+            return {index: 0, isProximityBased: true};
+        }
+        // the search could be more efficient but keeping it simple for now
+        // a possible improvement: pass in the lastIndex it was found in and check there first, then expand from there
+        for (let i = 0; i < children.length; i++) {
+            if (isCenterOfAInsideB(floatingAboveEl, children[i])) {
+                return {index: i, isProximityBased: false};
+            }
+        }
+        // this can happen if there is space around the children so the floating element has
+        //entered the container but not any of the children, in this case we will find the nearest child
+        let minDistanceSoFar = Number.MAX_VALUE;
+        let indexOfMin = undefined;
+        // we are checking all of them because we don't know whether we are dealing with a horizontal or vertical container and where the floating element entered from
+        for (let i = 0; i < children.length; i++) {
+            const distance = calcDistanceBetweenCenters(floatingAboveEl, children[i]);
+            if (distance < minDistanceSoFar) {
+                minDistanceSoFar = distance;
+                indexOfMin = i;
+            }
+        }
+        return {index: indexOfMin, isProximityBased: true};
+    }
+
+    const SCROLL_ZONE_PX = 25;
+
+    function makeScroller() {
+        let scrollingInfo;
+        function resetScrolling() {
+            scrollingInfo = {directionObj: undefined, stepPx: 0};
+        }
+        resetScrolling();
+        // directionObj {x: 0|1|-1, y:0|1|-1} - 1 means down in y and right in x
+        function scrollContainer(containerEl) {
+            const {directionObj, stepPx} = scrollingInfo;
+            if (directionObj) {
+                containerEl.scrollBy(directionObj.x * stepPx, directionObj.y * stepPx);
+                window.requestAnimationFrame(() => scrollContainer(containerEl));
+            }
+        }
+        function calcScrollStepPx(distancePx) {
+            return SCROLL_ZONE_PX - distancePx;
+        }
+
+        /**
+         * If the pointer is next to the sides of the element to scroll, will trigger scrolling
+         * Can be called repeatedly with updated pointer and elementToScroll values without issues
+         * @return {boolean} - true if scrolling was needed
+         */
+        function scrollIfNeeded(pointer, elementToScroll) {
+            if (!elementToScroll) {
+                return false;
+            }
+            const distances = calcInnerDistancesBetweenPointAndSidesOfElement(pointer, elementToScroll);
+            if (distances === null) {
+                resetScrolling();
+                return false;
+            }
+            const isAlreadyScrolling = !!scrollingInfo.directionObj;
+            let [scrollingVertically, scrollingHorizontally] = [false, false];
+            // vertical
+            if (elementToScroll.scrollHeight > elementToScroll.clientHeight) {
+                if (distances.bottom < SCROLL_ZONE_PX) {
+                    scrollingVertically = true;
+                    scrollingInfo.directionObj = {x: 0, y: 1};
+                    scrollingInfo.stepPx = calcScrollStepPx(distances.bottom);
+                } else if (distances.top < SCROLL_ZONE_PX) {
+                    scrollingVertically = true;
+                    scrollingInfo.directionObj = {x: 0, y: -1};
+                    scrollingInfo.stepPx = calcScrollStepPx(distances.top);
+                }
+                if (!isAlreadyScrolling && scrollingVertically) {
+                    scrollContainer(elementToScroll);
+                    return true;
+                }
+            }
+            // horizontal
+            if (elementToScroll.scrollWidth > elementToScroll.clientWidth) {
+                if (distances.right < SCROLL_ZONE_PX) {
+                    scrollingHorizontally = true;
+                    scrollingInfo.directionObj = {x: 1, y: 0};
+                    scrollingInfo.stepPx = calcScrollStepPx(distances.right);
+                } else if (distances.left < SCROLL_ZONE_PX) {
+                    scrollingHorizontally = true;
+                    scrollingInfo.directionObj = {x: -1, y: 0};
+                    scrollingInfo.stepPx = calcScrollStepPx(distances.left);
+                }
+                if (!isAlreadyScrolling && scrollingHorizontally) {
+                    scrollContainer(elementToScroll);
+                    return true;
+                }
+            }
+            resetScrolling();
+            return false;
+        }
+
+        return {
+            scrollIfNeeded,
+            resetScrolling
+        };
+    }
+
+    /**
+     * @param {Object} object
+     * @return {string}
+     */
+    function toString(object) {
+        return JSON.stringify(object, null, 2);
+    }
+
+    /**
+     * Finds the depth of the given node in the DOM tree
+     * @param {HTMLElement} node
+     * @return {number} - the depth of the node
+     */
+    function getDepth(node) {
+        if (!node) {
+            throw new Error("cannot get depth of a falsy node");
+        }
+        return _getDepth(node, 0);
+    }
+    function _getDepth(node, countSoFar = 0) {
+        if (!node.parentElement) {
+            return countSoFar - 1;
+        }
+        return _getDepth(node.parentElement, countSoFar + 1);
+    }
+
+    /**
+     * A simple util to shallow compare objects quickly, it doesn't validate the arguments so pass objects in
+     * @param {Object} objA
+     * @param {Object} objB
+     * @return {boolean} - true if objA and objB are shallow equal
+     */
+    function areObjectsShallowEqual(objA, objB) {
+        if (Object.keys(objA).length !== Object.keys(objB).length) {
+            return false;
+        }
+        for (const keyA in objA) {
+            if (!{}.hasOwnProperty.call(objB, keyA) || objB[keyA] !== objA[keyA]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    const INTERVAL_MS = 200;
+    const TOLERANCE_PX = 10;
+    const {scrollIfNeeded, resetScrolling} = makeScroller();
+    let next;
+
+    /**
+     * Tracks the dragged elements and performs the side effects when it is dragged over a drop zone (basically dispatching custom-events scrolling)
+     * @param {Set<HTMLElement>} dropZones
+     * @param {HTMLElement} draggedEl
+     * @param {number} [intervalMs = INTERVAL_MS]
+     */
+    function observe(draggedEl, dropZones, intervalMs = INTERVAL_MS) {
+        // initialization
+        let lastDropZoneFound;
+        let lastIndexFound;
+        let lastIsDraggedInADropZone = false;
+        let lastCentrePositionOfDragged;
+        // We are sorting to make sure that in case of nested zones of the same type the one "on top" is considered first
+        const dropZonesFromDeepToShallow = Array.from(dropZones).sort((dz1, dz2) => getDepth(dz2) - getDepth(dz1));
+
+        /**
+         * The main function in this module. Tracks where everything is/ should be a take the actions
+         */
+        function andNow() {
+            const currentCenterOfDragged = findCenterOfElement(draggedEl);
+            const scrolled = scrollIfNeeded(currentCenterOfDragged, lastDropZoneFound);
+            // we only want to make a new decision after the element was moved a bit to prevent flickering
+            if (
+                !scrolled &&
+                lastCentrePositionOfDragged &&
+                Math.abs(lastCentrePositionOfDragged.x - currentCenterOfDragged.x) < TOLERANCE_PX &&
+                Math.abs(lastCentrePositionOfDragged.y - currentCenterOfDragged.y) < TOLERANCE_PX
+            ) {
+                next = window.setTimeout(andNow, intervalMs);
+                return;
+            }
+            if (isElementOffDocument(draggedEl)) {
+                dispatchDraggedLeftDocument(draggedEl);
+                return;
+            }
+
+            lastCentrePositionOfDragged = currentCenterOfDragged;
+            // this is a simple algorithm, potential improvement: first look at lastDropZoneFound
+            let isDraggedInADropZone = false;
+            for (const dz of dropZonesFromDeepToShallow) {
+                const indexObj = findWouldBeIndex(draggedEl, dz);
+                if (indexObj === null) {
+                    // it is not inside
+                    continue;
+                }
+                const {index} = indexObj;
+                isDraggedInADropZone = true;
+                // the element is over a container
+                if (dz !== lastDropZoneFound) {
+                    lastDropZoneFound && dispatchDraggedElementLeftContainer(lastDropZoneFound, draggedEl);
+                    dispatchDraggedElementEnteredContainer(dz, indexObj, draggedEl);
+                    lastDropZoneFound = dz;
+                    lastIndexFound = index;
+                } else if (index !== lastIndexFound) {
+                    dispatchDraggedElementIsOverIndex(dz, indexObj, draggedEl);
+                    lastIndexFound = index;
+                }
+                // we handle looping with the 'continue' statement above
+                break;
+            }
+            // the first time the dragged element is not in any dropzone we need to notify the last dropzone it was in
+            if (!isDraggedInADropZone && lastIsDraggedInADropZone && lastDropZoneFound) {
+                dispatchDraggedElementLeftContainer(lastDropZoneFound, draggedEl);
+                lastDropZoneFound = undefined;
+                lastIndexFound = undefined;
+                lastIsDraggedInADropZone = false;
+            } else {
+                lastIsDraggedInADropZone = true;
+            }
+            next = window.setTimeout(andNow, intervalMs);
+        }
+        andNow();
+    }
+
+    // assumption - we can only observe one dragged element at a time, this could be changed in the future
+    function unobserve() {
+        clearTimeout(next);
+        resetScrolling();
+    }
+
+    const INTERVAL_MS$1 = 300;
+    let mousePosition;
+
+    /**
+     * Do not use this! it is visible for testing only until we get over the issue Cypress not triggering the mousemove listeners
+     * // TODO - make private (remove export)
+     * @param {{clientX: number, clientY: number}} e
+     */
+    function updateMousePosition(e) {
+        const c = e.touches ? e.touches[0] : e;
+        mousePosition = {x: c.clientX, y: c.clientY};
+    }
+    const {scrollIfNeeded: scrollIfNeeded$1, resetScrolling: resetScrolling$1} = makeScroller();
+    let next$1;
+
+    function loop$1() {
+        if (mousePosition) {
+            scrollIfNeeded$1(mousePosition, document.documentElement);
+        }
+        next$1 = window.setTimeout(loop$1, INTERVAL_MS$1);
+    }
+
+    /**
+     * will start watching the mouse pointer and scroll the window if it goes next to the edges
+     */
+    function armWindowScroller() {
+        window.addEventListener("mousemove", updateMousePosition);
+        window.addEventListener("touchmove", updateMousePosition);
+        loop$1();
+    }
+
+    /**
+     * will stop watching the mouse pointer and won't scroll the window anymore
+     */
+    function disarmWindowScroller() {
+        window.removeEventListener("mousemove", updateMousePosition);
+        window.removeEventListener("touchmove", updateMousePosition);
+        mousePosition = undefined;
+        window.clearTimeout(next$1);
+        resetScrolling$1();
+    }
+
+    const TRANSITION_DURATION_SECONDS = 0.2;
+
+    /**
+     * private helper function - creates a transition string for a property
+     * @param {string} property
+     * @return {string} - the transition string
+     */
+    function trs(property) {
+        return `${property} ${TRANSITION_DURATION_SECONDS}s ease`;
+    }
+    /**
+     * clones the given element and applies proper styles and transitions to the dragged element
+     * @param {HTMLElement} originalElement
+     * @return {Node} - the cloned, styled element
+     */
+    function createDraggedElementFrom(originalElement) {
+        const rect = originalElement.getBoundingClientRect();
+        const draggedEl = originalElement.cloneNode(true);
+        copyStylesFromTo(originalElement, draggedEl);
+        draggedEl.id = `dnd-action-dragged-el`;
+        draggedEl.style.position = "fixed";
+        draggedEl.style.top = `${rect.top}px`;
+        draggedEl.style.left = `${rect.left}px`;
+        draggedEl.style.margin = "0";
+        // we can't have relative or automatic height and width or it will break the illusion
+        draggedEl.style.boxSizing = "border-box";
+        draggedEl.style.height = `${rect.height}px`;
+        draggedEl.style.width = `${rect.width}px`;
+        draggedEl.style.transition = `${trs("width")}, ${trs("height")}, ${trs("background-color")}, ${trs("opacity")}, ${trs("color")} `;
+        // this is a workaround for a strange browser bug that causes the right border to disappear when all the transitions are added at the same time
+        window.setTimeout(() => (draggedEl.style.transition += `, ${trs("top")}, ${trs("left")}`), 0);
+        draggedEl.style.zIndex = "9999";
+        draggedEl.style.cursor = "grabbing";
+
+        return draggedEl;
+    }
+
+    /**
+     * styles the dragged element to a 'dropped' state
+     * @param {HTMLElement} draggedEl
+     */
+    function moveDraggedElementToWasDroppedState(draggedEl) {
+        draggedEl.style.cursor = "grab";
+    }
+
+    /**
+     * Morphs the dragged element style, maintains the mouse pointer within the element
+     * @param {HTMLElement} draggedEl
+     * @param {HTMLElement} copyFromEl - the element the dragged element should look like, typically the shadow element
+     * @param {number} currentMouseX
+     * @param {number} currentMouseY
+     * @param {function} transformDraggedElement - function to transform the dragged element, does nothing by default.
+     */
+    function morphDraggedElementToBeLike(draggedEl, copyFromEl, currentMouseX, currentMouseY, transformDraggedElement) {
+        const newRect = copyFromEl.getBoundingClientRect();
+        const draggedElRect = draggedEl.getBoundingClientRect();
+        const widthChange = newRect.width - draggedElRect.width;
+        const heightChange = newRect.height - draggedElRect.height;
+        if (widthChange || heightChange) {
+            const relativeDistanceOfMousePointerFromDraggedSides = {
+                left: (currentMouseX - draggedElRect.left) / draggedElRect.width,
+                top: (currentMouseY - draggedElRect.top) / draggedElRect.height
+            };
+            draggedEl.style.height = `${newRect.height}px`;
+            draggedEl.style.width = `${newRect.width}px`;
+            draggedEl.style.left = `${parseFloat(draggedEl.style.left) - relativeDistanceOfMousePointerFromDraggedSides.left * widthChange}px`;
+            draggedEl.style.top = `${parseFloat(draggedEl.style.top) - relativeDistanceOfMousePointerFromDraggedSides.top * heightChange}px`;
+        }
+
+        /// other properties
+        copyStylesFromTo(copyFromEl, draggedEl);
+        transformDraggedElement();
+    }
+
+    /**
+     *
+     * @param {HTMLElement} copyFromEl
+     * @param {HTMLElement} copyToEl
+     */
+    function copyStylesFromTo(copyFromEl, copyToEl) {
+        const computedStyle = window.getComputedStyle(copyFromEl);
+        Array.from(computedStyle)
+            .filter(
+                s =>
+                    s.startsWith("background") ||
+                    s.startsWith("padding") ||
+                    s.startsWith("font") ||
+                    s.startsWith("text") ||
+                    s.startsWith("align") ||
+                    s.startsWith("justify") ||
+                    s.startsWith("display") ||
+                    s.startsWith("flex") ||
+                    s.startsWith("border") ||
+                    s === "opacity" ||
+                    s === "color" ||
+                    s === "list-style-type"
+            )
+            .forEach(s => copyToEl.style.setProperty(s, computedStyle.getPropertyValue(s), computedStyle.getPropertyPriority(s)));
+    }
+
+    /**
+     * makes the element compatible with being draggable
+     * @param {HTMLElement} draggableEl
+     * @param {boolean} dragDisabled
+     */
+    function styleDraggable(draggableEl, dragDisabled) {
+        draggableEl.draggable = false;
+        draggableEl.ondragstart = () => false;
+        if (!dragDisabled) {
+            draggableEl.style.userSelect = "none";
+            draggableEl.style.WebkitUserSelect = "none";
+            draggableEl.style.cursor = "grab";
+        } else {
+            draggableEl.style.userSelect = "";
+            draggableEl.style.WebkitUserSelect = "";
+            draggableEl.style.cursor = "";
+        }
+    }
+
+    /**
+     * Hides the provided element so that it can stay in the dom without interrupting
+     * @param {HTMLElement} dragTarget
+     */
+    function hideOriginalDragTarget(dragTarget) {
+        dragTarget.style.display = "none";
+        dragTarget.style.position = "fixed";
+        dragTarget.style.zIndex = "-5";
+    }
+
+    /**
+     * styles the shadow element
+     * @param {HTMLElement} shadowEl
+     */
+    function styleShadowEl(shadowEl) {
+        shadowEl.style.visibility = "hidden";
+    }
+
+    /**
+     * will mark the given dropzones as visually active
+     * @param {Array<HTMLElement>} dropZones
+     * @param {Function} getStyles - maps a dropzone to a styles object (so the styles can be removed)
+     */
+    function styleActiveDropZones(dropZones, getStyles = () => {}) {
+        dropZones.forEach(dz => {
+            const styles = getStyles(dz);
+            Object.keys(styles).forEach(style => {
+                dz.style[style] = styles[style];
+            });
+        });
+    }
+
+    /**
+     * will remove the 'active' styling from given dropzones
+     * @param {Array<HTMLElement>} dropZones
+     * @param {Function} getStyles - maps a dropzone to a styles object
+     */
+    function styleInactiveDropZones(dropZones, getStyles = () => {}) {
+        dropZones.forEach(dz => {
+            const styles = getStyles(dz);
+            Object.keys(styles).forEach(style => {
+                dz.style[style] = "";
+            });
+        });
+    }
+
+    const DEFAULT_DROP_ZONE_TYPE = "--any--";
+    const MIN_OBSERVATION_INTERVAL_MS = 100;
+    const MIN_MOVEMENT_BEFORE_DRAG_START_PX = 3;
+    const DEFAULT_DROP_TARGET_STYLE = {
+        outline: "rgba(255, 255, 102, 0.7) solid 2px"
+    };
+
+    let originalDragTarget;
+    let draggedEl;
+    let draggedElData;
+    let draggedElType;
+    let originDropZone;
+    let originIndex;
+    let shadowElData;
+    let shadowElDropZone;
+    let dragStartMousePosition;
+    let currentMousePosition;
+    let isWorkingOnPreviousDrag = false;
+    let finalizingPreviousDrag = false;
+
+    // a map from type to a set of drop-zones
+    const typeToDropZones = new Map();
+    // important - this is needed because otherwise the config that would be used for everyone is the config of the element that created the event listeners
+    const dzToConfig = new Map();
+    // this is needed in order to be able to cleanup old listeners and avoid stale closures issues (as the listener is defined within each zone)
+    const elToMouseDownListener = new WeakMap();
+
+    /* drop-zones registration management */
+    function registerDropZone(dropZoneEl, type) {
+        if (!typeToDropZones.has(type)) {
+            typeToDropZones.set(type, new Set());
+        }
+        if (!typeToDropZones.get(type).has(dropZoneEl)) {
+            typeToDropZones.get(type).add(dropZoneEl);
+            incrementActiveDropZoneCount();
+        }
+    }
+    function unregisterDropZone(dropZoneEl, type) {
+        typeToDropZones.get(type).delete(dropZoneEl);
+        decrementActiveDropZoneCount();
+        if (typeToDropZones.get(type).size === 0) {
+            typeToDropZones.delete(type);
+        }
+    }
+
+    /* functions to manage observing the dragged element and trigger custom drag-events */
+    function watchDraggedElement() {
+        armWindowScroller();
+        const dropZones = typeToDropZones.get(draggedElType);
+        for (const dz of dropZones) {
+            dz.addEventListener(DRAGGED_ENTERED_EVENT_NAME, handleDraggedEntered);
+            dz.addEventListener(DRAGGED_LEFT_EVENT_NAME, handleDraggedLeft);
+            dz.addEventListener(DRAGGED_OVER_INDEX_EVENT_NAME, handleDraggedIsOverIndex);
+        }
+        window.addEventListener(DRAGGED_LEFT_DOCUMENT_EVENT_NAME, handleDrop);
+        // it is important that we don't have an interval that is faster than the flip duration because it can cause elements to jump bach and forth
+        const observationIntervalMs = Math.max(
+            MIN_OBSERVATION_INTERVAL_MS,
+            ...Array.from(dropZones.keys()).map(dz => dzToConfig.get(dz).dropAnimationDurationMs)
+        );
+        observe(draggedEl, dropZones, observationIntervalMs * 1.07);
+    }
+    function unWatchDraggedElement() {
+        disarmWindowScroller();
+        const dropZones = typeToDropZones.get(draggedElType);
+        for (const dz of dropZones) {
+            dz.removeEventListener(DRAGGED_ENTERED_EVENT_NAME, handleDraggedEntered);
+            dz.removeEventListener(DRAGGED_LEFT_EVENT_NAME, handleDraggedLeft);
+            dz.removeEventListener(DRAGGED_OVER_INDEX_EVENT_NAME, handleDraggedIsOverIndex);
+        }
+        window.removeEventListener(DRAGGED_LEFT_DOCUMENT_EVENT_NAME, handleDrop);
+        unobserve();
+    }
+
+    /* custom drag-events handlers */
+    function handleDraggedEntered(e) {
+        let {items, dropFromOthersDisabled} = dzToConfig.get(e.currentTarget);
+        if (dropFromOthersDisabled && e.currentTarget !== originDropZone) {
+            return;
+        }
+        // this deals with another race condition. in rare occasions (super rapid operations) the list hasn't updated yet
+        items = items.filter(i => i[ITEM_ID_KEY] !== shadowElData[ITEM_ID_KEY]);
+        const {index, isProximityBased} = e.detail.indexObj;
+        const shadowElIdx = isProximityBased && index === e.currentTarget.children.length - 1 ? index + 1 : index;
+        shadowElDropZone = e.currentTarget;
+        items.splice(shadowElIdx, 0, shadowElData);
+        dispatchConsiderEvent(e.currentTarget, items, {trigger: TRIGGERS.DRAGGED_ENTERED, id: draggedElData[ITEM_ID_KEY], source: SOURCES.POINTER});
+    }
+    function handleDraggedLeft(e) {
+        const {items, dropFromOthersDisabled} = dzToConfig.get(e.currentTarget);
+        if (dropFromOthersDisabled && e.currentTarget !== originDropZone) {
+            return;
+        }
+        const shadowElIdx = items.findIndex(item => !!item[SHADOW_ITEM_MARKER_PROPERTY_NAME]);
+        items.splice(shadowElIdx, 1);
+        shadowElDropZone = undefined;
+        dispatchConsiderEvent(e.currentTarget, items, {trigger: TRIGGERS.DRAGGED_LEFT, id: draggedElData[ITEM_ID_KEY], source: SOURCES.POINTER});
+    }
+    function handleDraggedIsOverIndex(e) {
+        const {items, dropFromOthersDisabled} = dzToConfig.get(e.currentTarget);
+        if (dropFromOthersDisabled && e.currentTarget !== originDropZone) {
+            return;
+        }
+        const {index} = e.detail.indexObj;
+        const shadowElIdx = items.findIndex(item => !!item[SHADOW_ITEM_MARKER_PROPERTY_NAME]);
+        items.splice(shadowElIdx, 1);
+        items.splice(index, 0, shadowElData);
+        dispatchConsiderEvent(e.currentTarget, items, {trigger: TRIGGERS.DRAGGED_OVER_INDEX, id: draggedElData[ITEM_ID_KEY], source: SOURCES.POINTER});
+    }
+
+    // Global mouse/touch-events handlers
+    function handleMouseMove(e) {
+        e.preventDefault();
+        const c = e.touches ? e.touches[0] : e;
+        currentMousePosition = {x: c.clientX, y: c.clientY};
+        draggedEl.style.transform = `translate3d(${currentMousePosition.x - dragStartMousePosition.x}px, ${
+        currentMousePosition.y - dragStartMousePosition.y
+    }px, 0)`;
+    }
+
+    function handleDrop() {
+        finalizingPreviousDrag = true;
+        // cleanup
+        window.removeEventListener("mousemove", handleMouseMove);
+        window.removeEventListener("touchmove", handleMouseMove);
+        window.removeEventListener("mouseup", handleDrop);
+        window.removeEventListener("touchend", handleDrop);
+        unWatchDraggedElement();
+        moveDraggedElementToWasDroppedState(draggedEl);
+        let finalizeFunction;
+        if (shadowElDropZone) {
+            let {items, type} = dzToConfig.get(shadowElDropZone);
+            styleInactiveDropZones(typeToDropZones.get(type), dz => dzToConfig.get(dz).dropTargetStyle);
+            let shadowElIdx = items.findIndex(item => !!item[SHADOW_ITEM_MARKER_PROPERTY_NAME]);
+            // the handler might remove the shadow element, ex: dragula like copy on drag
+            if (shadowElIdx === -1) shadowElIdx = originIndex;
+            items = items.map(item => (item[SHADOW_ITEM_MARKER_PROPERTY_NAME] ? draggedElData : item));
+            finalizeFunction = function finalizeWithinZone() {
+                dispatchFinalizeEvent(shadowElDropZone, items, {
+                    trigger: TRIGGERS.DROPPED_INTO_ZONE,
+                    id: draggedElData[ITEM_ID_KEY],
+                    source: SOURCES.POINTER
+                });
+                if (shadowElDropZone !== originDropZone) {
+                    // letting the origin drop zone know the element was permanently taken away
+                    dispatchFinalizeEvent(originDropZone, dzToConfig.get(originDropZone).items, {
+                        trigger: TRIGGERS.DROPPED_INTO_ANOTHER,
+                        id: draggedElData[ITEM_ID_KEY],
+                        source: SOURCES.POINTER
+                    });
+                }
+                shadowElDropZone.children[shadowElIdx].style.visibility = "";
+                cleanupPostDrop();
+            };
+            animateDraggedToFinalPosition(shadowElIdx, finalizeFunction);
+        } else {
+            let {items, type} = dzToConfig.get(originDropZone);
+            styleInactiveDropZones(typeToDropZones.get(type), dz => dzToConfig.get(dz).dropTargetStyle);
+            items.splice(originIndex, 0, shadowElData);
+            shadowElDropZone = originDropZone;
+            dispatchConsiderEvent(originDropZone, items, {
+                trigger: TRIGGERS.DROPPED_OUTSIDE_OF_ANY,
+                id: draggedElData[ITEM_ID_KEY],
+                source: SOURCES.POINTER
+            });
+            finalizeFunction = function finalizeBackToOrigin() {
+                const finalItems = [...items];
+                finalItems.splice(originIndex, 1, draggedElData);
+                dispatchFinalizeEvent(originDropZone, finalItems, {
+                    trigger: TRIGGERS.DROPPED_OUTSIDE_OF_ANY,
+                    id: draggedElData[ITEM_ID_KEY],
+                    source: SOURCES.POINTER
+                });
+                shadowElDropZone.children[originIndex].style.visibility = "";
+                cleanupPostDrop();
+            };
+            window.setTimeout(() => animateDraggedToFinalPosition(originIndex, finalizeFunction), 0);
+        }
+    }
+
+    // helper function for handleDrop
+    function animateDraggedToFinalPosition(shadowElIdx, callback) {
+        const shadowElRect = shadowElDropZone.children[shadowElIdx].getBoundingClientRect();
+        const newTransform = {
+            x: shadowElRect.left - parseFloat(draggedEl.style.left),
+            y: shadowElRect.top - parseFloat(draggedEl.style.top)
+        };
+        const {dropAnimationDurationMs} = dzToConfig.get(shadowElDropZone);
+        const transition = `transform ${dropAnimationDurationMs}ms ease`;
+        draggedEl.style.transition = draggedEl.style.transition ? draggedEl.style.transition + "," + transition : transition;
+        draggedEl.style.transform = `translate3d(${newTransform.x}px, ${newTransform.y}px, 0)`;
+        window.setTimeout(callback, dropAnimationDurationMs);
+    }
+
+    /* cleanup */
+    function cleanupPostDrop() {
+        draggedEl.remove();
+        originalDragTarget.remove();
+        draggedEl = undefined;
+        originalDragTarget = undefined;
+        draggedElData = undefined;
+        draggedElType = undefined;
+        originDropZone = undefined;
+        originIndex = undefined;
+        shadowElData = undefined;
+        shadowElDropZone = undefined;
+        dragStartMousePosition = undefined;
+        currentMousePosition = undefined;
+        isWorkingOnPreviousDrag = false;
+        finalizingPreviousDrag = false;
+    }
+
+    function dndzone(node, options) {
+        const config = {
+            items: undefined,
+            type: undefined,
+            flipDurationMs: 0,
+            dragDisabled: false,
+            dropFromOthersDisabled: false,
+            dropTargetStyle: DEFAULT_DROP_TARGET_STYLE,
+            transformDraggedElement: () => {}
+        };
+        let elToIdx = new Map();
+
+        function addMaybeListeners() {
+            window.addEventListener("mousemove", handleMouseMoveMaybeDragStart, {passive: false});
+            window.addEventListener("touchmove", handleMouseMoveMaybeDragStart, {passive: false, capture: false});
+            window.addEventListener("mouseup", handleFalseAlarm, {passive: false});
+            window.addEventListener("touchend", handleFalseAlarm, {passive: false});
+        }
+        function removeMaybeListeners() {
+            window.removeEventListener("mousemove", handleMouseMoveMaybeDragStart);
+            window.removeEventListener("touchmove", handleMouseMoveMaybeDragStart);
+            window.removeEventListener("mouseup", handleFalseAlarm);
+            window.removeEventListener("touchend", handleFalseAlarm);
+        }
+        function handleFalseAlarm() {
+            removeMaybeListeners();
+            originalDragTarget = undefined;
+            dragStartMousePosition = undefined;
+            currentMousePosition = undefined;
+        }
+
+        function handleMouseMoveMaybeDragStart(e) {
+            e.preventDefault();
+            const c = e.touches ? e.touches[0] : e;
+            currentMousePosition = {x: c.clientX, y: c.clientY};
+            if (
+                Math.abs(currentMousePosition.x - dragStartMousePosition.x) >= MIN_MOVEMENT_BEFORE_DRAG_START_PX ||
+                Math.abs(currentMousePosition.y - dragStartMousePosition.y) >= MIN_MOVEMENT_BEFORE_DRAG_START_PX
+            ) {
+                removeMaybeListeners();
+                handleDragStart();
+            }
+        }
+        function handleMouseDown(e) {
+            // prevents responding to any button but left click which equals 0 (which is falsy)
+            if (e.button) {
+                return;
+            }
+            if (isWorkingOnPreviousDrag) {
+                return;
+            }
+            e.stopPropagation();
+            const c = e.touches ? e.touches[0] : e;
+            dragStartMousePosition = {x: c.clientX, y: c.clientY};
+            currentMousePosition = {...dragStartMousePosition};
+            originalDragTarget = e.currentTarget;
+            addMaybeListeners();
+        }
+
+        function handleDragStart() {
+            isWorkingOnPreviousDrag = true;
+
+            // initialising globals
+            const currentIdx = elToIdx.get(originalDragTarget);
+            originIndex = currentIdx;
+            originDropZone = originalDragTarget.parentElement;
+            const {items, type} = config;
+            draggedElData = {...items[currentIdx]};
+            draggedElType = type;
+            shadowElData = {...draggedElData, [SHADOW_ITEM_MARKER_PROPERTY_NAME]: true};
+
+            // creating the draggable element
+            draggedEl = createDraggedElementFrom(originalDragTarget);
+            // We will keep the original dom node in the dom because touch events keep firing on it, we want to re-add it after the framework removes it
+            function keepOriginalElementInDom() {
+                const {items: itemsNow} = config;
+                if (!draggedEl.parentElement && (!itemsNow[originIndex] || draggedElData[ITEM_ID_KEY] !== itemsNow[originIndex][ITEM_ID_KEY])) {
+                    document.body.appendChild(draggedEl);
+                    // to prevent the outline from disappearing
+                    draggedEl.focus();
+                    watchDraggedElement();
+                    hideOriginalDragTarget(originalDragTarget);
+                    document.body.appendChild(originalDragTarget);
+                } else {
+                    window.requestAnimationFrame(keepOriginalElementInDom);
+                }
+            }
+            window.requestAnimationFrame(keepOriginalElementInDom);
+
+            styleActiveDropZones(
+                Array.from(typeToDropZones.get(config.type)).filter(dz => dz === originDropZone || !dzToConfig.get(dz).dropFromOthersDisabled),
+                dz => dzToConfig.get(dz).dropTargetStyle
+            );
+
+            // removing the original element by removing its data entry
+            items.splice(currentIdx, 1);
+            dispatchConsiderEvent(originDropZone, items, {trigger: TRIGGERS.DRAG_STARTED, id: draggedElData[ITEM_ID_KEY], source: SOURCES.POINTER});
+
+            // handing over to global handlers - starting to watch the element
+            window.addEventListener("mousemove", handleMouseMove, {passive: false});
+            window.addEventListener("touchmove", handleMouseMove, {passive: false, capture: false});
+            window.addEventListener("mouseup", handleDrop, {passive: false});
+            window.addEventListener("touchend", handleDrop, {passive: false});
+        }
+
+        function configure({
+            items = undefined,
+            flipDurationMs: dropAnimationDurationMs = 0,
+            type: newType = DEFAULT_DROP_ZONE_TYPE,
+            dragDisabled = false,
+            dropFromOthersDisabled = false,
+            dropTargetStyle = DEFAULT_DROP_TARGET_STYLE,
+            transformDraggedElement = () => {}
+        }) {
+            config.dropAnimationDurationMs = dropAnimationDurationMs;
+            if (config.type && newType !== config.type) {
+                unregisterDropZone(node, config.type);
+            }
+            config.type = newType;
+            registerDropZone(node, newType);
+
+            config.items = [...items];
+            config.dragDisabled = dragDisabled;
+            config.transformDraggedElement = transformDraggedElement;
+
+            // realtime update for dropTargetStyle
+            if (isWorkingOnPreviousDrag && !finalizingPreviousDrag && !areObjectsShallowEqual(dropTargetStyle, config.dropTargetStyle)) {
+                styleInactiveDropZones([node], () => config.dropTargetStyle);
+                styleActiveDropZones([node], () => dropTargetStyle);
+            }
+            config.dropTargetStyle = dropTargetStyle;
+
+            // realtime update for dropFromOthersDisabled
+            if (isWorkingOnPreviousDrag && config.dropFromOthersDisabled !== dropFromOthersDisabled) {
+                if (dropFromOthersDisabled) {
+                    styleInactiveDropZones([node], dz => dzToConfig.get(dz).dropTargetStyle);
+                } else {
+                    styleActiveDropZones([node], dz => dzToConfig.get(dz).dropTargetStyle);
+                }
+            }
+            config.dropFromOthersDisabled = dropFromOthersDisabled;
+
+            dzToConfig.set(node, config);
+            for (let idx = 0; idx < node.children.length; idx++) {
+                const draggableEl = node.children[idx];
+                styleDraggable(draggableEl, dragDisabled);
+                if (config.items[idx][SHADOW_ITEM_MARKER_PROPERTY_NAME]) {
+                    morphDraggedElementToBeLike(draggedEl, draggableEl, currentMousePosition.x, currentMousePosition.y, () =>
+                        config.transformDraggedElement(draggedEl, draggedElData, idx)
+                    );
+                    styleShadowEl(draggableEl);
+                    continue;
+                }
+                draggableEl.removeEventListener("mousedown", elToMouseDownListener.get(draggableEl));
+                draggableEl.removeEventListener("touchstart", elToMouseDownListener.get(draggableEl));
+                if (!dragDisabled) {
+                    draggableEl.addEventListener("mousedown", handleMouseDown);
+                    draggableEl.addEventListener("touchstart", handleMouseDown);
+                    elToMouseDownListener.set(draggableEl, handleMouseDown);
+                }
+                // updating the idx
+                elToIdx.set(draggableEl, idx);
+            }
+        }
+        configure(options);
+
+        return {
+            update: newOptions => {
+                configure(newOptions);
+            },
+            destroy: () => {
+                unregisterDropZone(node, config.type);
+                dzToConfig.delete(node);
+            }
+        };
+    }
+
+    const INSTRUCTION_IDs = {
+        DND_ZONE_ACTIVE: "dnd-zone-active",
+        DND_ZONE_DRAG_DISABLED: "dnd-zone-drag-disabled"
+    };
+    const ID_TO_INSTRUCTION = {
+        [INSTRUCTION_IDs.DND_ZONE_ACTIVE]: "Tab to one the items and press space-bar or enter to start dragging it",
+        [INSTRUCTION_IDs.DND_ZONE_DRAG_DISABLED]: "This is a disabled drag and drop list"
+    };
+
+    const ALERT_DIV_ID = "dnd-action-aria-alert";
+    let alertsDiv;
+    /**
+     * Initializes the static aria instructions so they can be attached to zones
+     * @return {{DND_ZONE_ACTIVE: string, DND_ZONE_DRAG_DISABLED: string} | null} - the IDs for static aria instruction (to be used via aria-describedby) or null on the server
+     */
+    function initAria() {
+        if (isOnServer) return null;
+
+        // setting the dynamic alerts
+        alertsDiv = document.createElement("div");
+        (function initAlertsDiv() {
+            alertsDiv.id = ALERT_DIV_ID;
+            // tab index -1 makes the alert be read twice on chrome for some reason
+            //alertsDiv.tabIndex = -1;
+            alertsDiv.style.position = "fixed";
+            alertsDiv.style.bottom = "0";
+            alertsDiv.style.left = "0";
+            alertsDiv.style.zIndex = "-5";
+            alertsDiv.style.opacity = "0";
+            alertsDiv.style.height = "0";
+            alertsDiv.style.width = "0";
+            alertsDiv.setAttribute("role", "alert");
+        })();
+        document.body.prepend(alertsDiv);
+
+        // setting the instructions
+        Object.entries(ID_TO_INSTRUCTION).forEach(([id, txt]) => document.body.prepend(instructionToHiddenDiv(id, txt)));
+        return {...INSTRUCTION_IDs};
+    }
+    function instructionToHiddenDiv(id, txt) {
+        const div = document.createElement("div");
+        div.id = id;
+        div.innerHTML = `<p>${txt}</p>`;
+        div.style.display = "none";
+        div.style.position = "fixed";
+        div.style.zIndex = "-5";
+        return div;
+    }
+
+    /**
+     * Will make the screen reader alert the provided text to the user
+     * @param {string} txt
+     */
+    function alertToScreenReader(txt) {
+        alertsDiv.innerHTML = "";
+        const alertText = document.createTextNode(txt);
+        alertsDiv.appendChild(alertText);
+        // this is needed for Safari
+        alertsDiv.style.display = "none";
+        alertsDiv.style.display = "inline";
+    }
+
+    const DEFAULT_DROP_ZONE_TYPE$1 = "--any--";
+    const DEFAULT_DROP_TARGET_STYLE$1 = {
+        outline: "rgba(255, 255, 102, 0.7) solid 2px"
+    };
+
+    let isDragging = false;
+    let draggedItemType;
+    let focusedDz;
+    let focusedDzLabel = "";
+    let focusedItem;
+    let focusedItemId;
+    let focusedItemLabel = "";
+    const allDragTargets = new WeakSet();
+    const elToKeyDownListeners = new WeakMap();
+    const elToFocusListeners = new WeakMap();
+    const dzToHandles = new Map();
+    const dzToConfig$1 = new Map();
+    const typeToDropZones$1 = new Map();
+
+    /* TODO (potentially)
+     * what's the deal with the black border of voice-reader not following focus?
+     * maybe keep focus on the last dragged item upon drop?
+     */
+
+    const INSTRUCTION_IDs$1 = initAria();
+
+    /* drop-zones registration management */
+    function registerDropZone$1(dropZoneEl, type) {
+        if (typeToDropZones$1.size === 0) {
+            window.addEventListener("keydown", globalKeyDownHandler);
+            window.addEventListener("click", globalClickHandler);
+        }
+        if (!typeToDropZones$1.has(type)) {
+            typeToDropZones$1.set(type, new Set());
+        }
+        if (!typeToDropZones$1.get(type).has(dropZoneEl)) {
+            typeToDropZones$1.get(type).add(dropZoneEl);
+            incrementActiveDropZoneCount();
+        }
+    }
+    function unregisterDropZone$1(dropZoneEl, type) {
+        typeToDropZones$1.get(type).delete(dropZoneEl);
+        decrementActiveDropZoneCount();
+        if (typeToDropZones$1.get(type).size === 0) {
+            typeToDropZones$1.delete(type);
+        }
+        if (typeToDropZones$1.size === 0) {
+            window.removeEventListener("keydown", globalKeyDownHandler);
+            window.removeEventListener("click", globalClickHandler);
+        }
+    }
+
+    function globalKeyDownHandler(e) {
+        if (!isDragging) return;
+        switch (e.key) {
+            case "Escape": {
+                handleDrop$1();
+                break;
+            }
+        }
+    }
+
+    function globalClickHandler() {
+        if (!isDragging) return;
+        if (!allDragTargets.has(document.activeElement)) {
+            handleDrop$1();
+        }
+    }
+
+    function handleZoneFocus(e) {
+        if (!isDragging) return;
+        const newlyFocusedDz = e.currentTarget;
+        if (newlyFocusedDz === focusedDz) return;
+
+        focusedDzLabel = newlyFocusedDz.getAttribute("aria-label") || "";
+        const {items: originItems} = dzToConfig$1.get(focusedDz);
+        const originItem = originItems.find(item => item[ITEM_ID_KEY] === focusedItemId);
+        const originIdx = originItems.indexOf(originItem);
+        const itemToMove = originItems.splice(originIdx, 1)[0];
+        const {items: targetItems, autoAriaDisabled} = dzToConfig$1.get(newlyFocusedDz);
+        if (
+            newlyFocusedDz.getBoundingClientRect().top < focusedDz.getBoundingClientRect().top ||
+            newlyFocusedDz.getBoundingClientRect().left < focusedDz.getBoundingClientRect().left
+        ) {
+            targetItems.push(itemToMove);
+            if (!autoAriaDisabled) {
+                alertToScreenReader(`Moved item ${focusedItemLabel} to the end of the list ${focusedDzLabel}`);
+            }
+        } else {
+            targetItems.unshift(itemToMove);
+            if (!autoAriaDisabled) {
+                alertToScreenReader(`Moved item ${focusedItemLabel} to the beginning of the list ${focusedDzLabel}`);
+            }
+        }
+        const dzFrom = focusedDz;
+        dispatchFinalizeEvent(dzFrom, originItems, {trigger: TRIGGERS.DROPPED_INTO_ANOTHER, id: focusedItemId, source: SOURCES.KEYBOARD});
+        dispatchFinalizeEvent(newlyFocusedDz, targetItems, {trigger: TRIGGERS.DROPPED_INTO_ZONE, id: focusedItemId, source: SOURCES.KEYBOARD});
+        focusedDz = newlyFocusedDz;
+    }
+
+    function triggerAllDzsUpdate() {
+        dzToHandles.forEach(({update}, dz) => update(dzToConfig$1.get(dz)));
+    }
+
+    function handleDrop$1(dispatchConsider = true) {
+        if (!dzToConfig$1.get(focusedDz).autoAriaDisabled) {
+            alertToScreenReader(`Stopped dragging item ${focusedItemLabel}`);
+        }
+        if (allDragTargets.has(document.activeElement)) {
+            document.activeElement.blur();
+        }
+        if (dispatchConsider) {
+            dispatchConsiderEvent(focusedDz, dzToConfig$1.get(focusedDz).items, {
+                trigger: TRIGGERS.DRAG_STOPPED,
+                id: focusedItemId,
+                source: SOURCES.KEYBOARD
+            });
+        }
+        styleInactiveDropZones(typeToDropZones$1.get(draggedItemType), dz => dzToConfig$1.get(dz).dropTargetStyle);
+        focusedItem = null;
+        focusedItemId = null;
+        focusedItemLabel = "";
+        draggedItemType = null;
+        focusedDz = null;
+        focusedDzLabel = "";
+        isDragging = false;
+        triggerAllDzsUpdate();
+    }
+    //////
+    function dndzone$1(node, options) {
+        const config = {
+            items: undefined,
+            type: undefined,
+            dragDisabled: false,
+            dropFromOthersDisabled: false,
+            dropTargetStyle: DEFAULT_DROP_TARGET_STYLE$1,
+            autoAriaDisabled: false
+        };
+
+        function swap(arr, i, j) {
+            if (arr.length <= 1) return;
+            arr.splice(j, 1, arr.splice(i, 1, arr[j])[0]);
+        }
+
+        function handleKeyDown(e) {
+            switch (e.key) {
+                case "Enter":
+                case " ": {
+                    // we don't want to affect nested input elements
+                    if ((e.target.value !== undefined || e.target.isContentEditable) && !allDragTargets.has(e.target)) {
+                        return;
+                    }
+                    e.preventDefault(); // preventing scrolling on spacebar
+                    e.stopPropagation();
+                    if (isDragging) {
+                        // TODO - should this trigger a drop? only here or in general (as in when hitting space or enter outside of any zone)?
+                        handleDrop$1();
+                    } else {
+                        // drag start
+                        handleDragStart(e);
+                    }
+                    break;
+                }
+                case "ArrowDown":
+                case "ArrowRight": {
+                    if (!isDragging) return;
+                    e.preventDefault(); // prevent scrolling
+                    e.stopPropagation();
+                    const {items} = dzToConfig$1.get(node);
+                    const children = Array.from(node.children);
+                    const idx = children.indexOf(e.currentTarget);
+                    if (idx < children.length - 1) {
+                        if (!config.autoAriaDisabled) {
+                            alertToScreenReader(`Moved item ${focusedItemLabel} to position ${idx + 2} in the list ${focusedDzLabel}`);
+                        }
+                        swap(items, idx, idx + 1);
+                        dispatchFinalizeEvent(node, items, {trigger: TRIGGERS.DROPPED_INTO_ZONE, id: focusedItemId, source: SOURCES.KEYBOARD});
+                    }
+                    break;
+                }
+                case "ArrowUp":
+                case "ArrowLeft": {
+                    if (!isDragging) return;
+                    e.preventDefault(); // prevent scrolling
+                    e.stopPropagation();
+                    const {items} = dzToConfig$1.get(node);
+                    const children = Array.from(node.children);
+                    const idx = children.indexOf(e.currentTarget);
+                    if (idx > 0) {
+                        if (!config.autoAriaDisabled) {
+                            alertToScreenReader(`Moved item ${focusedItemLabel} to position ${idx} in the list ${focusedDzLabel}`);
+                        }
+                        swap(items, idx, idx - 1);
+                        dispatchFinalizeEvent(node, items, {trigger: TRIGGERS.DROPPED_INTO_ZONE, id: focusedItemId, source: SOURCES.KEYBOARD});
+                    }
+                    break;
+                }
+            }
+        }
+        function handleDragStart(e) {
+            if (!config.autoAriaDisabled) {
+                alertToScreenReader(
+                    `Started dragging item ${focusedItemLabel}. Use the arrow keys to move it within its list ${focusedDzLabel}, or tab to another list in order to move the item into it`
+                );
+            }
+            setCurrentFocusedItem(e.currentTarget);
+            focusedDz = node;
+            draggedItemType = config.type;
+            isDragging = true;
+            styleActiveDropZones(
+                Array.from(typeToDropZones$1.get(config.type)).filter(dz => dz === focusedDz || !dzToConfig$1.get(dz).dropFromOthersDisabled),
+                dz => dzToConfig$1.get(dz).dropTargetStyle
+            );
+            dispatchConsiderEvent(node, dzToConfig$1.get(node).items, {trigger: TRIGGERS.DRAG_STARTED, id: focusedItemId, source: SOURCES.KEYBOARD});
+            triggerAllDzsUpdate();
+        }
+
+        function handleClick(e) {
+            if (!isDragging) return;
+            if (e.currentTarget === focusedItem) return;
+            e.stopPropagation();
+            handleDrop$1(false);
+            handleDragStart(e);
+        }
+        function setCurrentFocusedItem(draggableEl) {
+            const {items} = dzToConfig$1.get(node);
+            const children = Array.from(node.children);
+            const focusedItemIdx = children.indexOf(draggableEl);
+            focusedItem = draggableEl;
+            focusedItemId = items[focusedItemIdx][ITEM_ID_KEY];
+            focusedItemLabel = children[focusedItemIdx].getAttribute("aria-label") || "";
+        }
+
+        function configure({
+            items = [],
+            type: newType = DEFAULT_DROP_ZONE_TYPE$1,
+            dragDisabled = false,
+            dropFromOthersDisabled = false,
+            dropTargetStyle = DEFAULT_DROP_TARGET_STYLE$1,
+            autoAriaDisabled = false
+        }) {
+            config.items = [...items];
+            config.dragDisabled = dragDisabled;
+            config.dropFromOthersDisabled = dropFromOthersDisabled;
+            config.dropTargetStyle = dropTargetStyle;
+            config.autoAriaDisabled = autoAriaDisabled;
+            if (!autoAriaDisabled) {
+                node.setAttribute("aria-disabled", dragDisabled);
+                node.setAttribute("role", "list");
+                node.setAttribute("aria-describedby", dragDisabled ? INSTRUCTION_IDs$1.DND_ZONE_DRAG_DISABLED : INSTRUCTION_IDs$1.DND_ZONE_ACTIVE);
+            }
+            if (config.type && newType !== config.type) {
+                unregisterDropZone$1(node, config.type);
+            }
+            config.type = newType;
+            registerDropZone$1(node, newType);
+            dzToConfig$1.set(node, config);
+
+            node.tabIndex =
+                isDragging &&
+                (node === focusedDz ||
+                    focusedItem.contains(node) ||
+                    config.dropFromOthersDisabled ||
+                    (focusedDz && config.type !== dzToConfig$1.get(focusedDz).type))
+                    ? -1
+                    : 0;
+            node.addEventListener("focus", handleZoneFocus);
+
+            for (let i = 0; i < node.children.length; i++) {
+                const draggableEl = node.children[i];
+                allDragTargets.add(draggableEl);
+                draggableEl.tabIndex = isDragging ? -1 : 0;
+                if (!autoAriaDisabled) {
+                    draggableEl.setAttribute("role", "listitem");
+                }
+                draggableEl.removeEventListener("keydown", elToKeyDownListeners.get(draggableEl));
+                draggableEl.removeEventListener("click", elToFocusListeners.get(draggableEl));
+                if (!dragDisabled) {
+                    draggableEl.addEventListener("keydown", handleKeyDown);
+                    elToKeyDownListeners.set(draggableEl, handleKeyDown);
+                    draggableEl.addEventListener("click", handleClick);
+                    elToFocusListeners.set(draggableEl, handleClick);
+                }
+                if (isDragging && config.items[i][ITEM_ID_KEY] === focusedItemId) {
+                    // if it is a nested dropzone, it was re-rendered and we need to refresh our pointer
+                    focusedItem = draggableEl;
+                    // without this the element loses focus if it moves backwards in the list
+                    draggableEl.focus();
+                }
+            }
+        }
+        configure(options);
+
+        const handles = {
+            update: newOptions => {
+                configure(newOptions);
+            },
+            destroy: () => {
+                unregisterDropZone$1(node, config.type);
+                dzToConfig$1.delete(node);
+                dzToHandles.delete(node);
+            }
+        };
+        dzToHandles.set(node, handles);
+        return handles;
+    }
+
+    /**
+     * A custom action to turn any container to a dnd zone and all of its direct children to draggables
+     * Supports mouse, touch and keyboard interactions.
+     * Dispatches two events that the container is expected to react to by modifying its list of items,
+     * which will then feed back in to this action via the update function
+     *
+     * @typedef {Object} Options
+     * @property {Array} items - the list of items that was used to generate the children of the given node (the list used in the #each block
+     * @property {string} [type] - the type of the dnd zone. children dragged from here can only be dropped in other zones of the same type, default to a base type
+     * @property {number} [flipDurationMs] - if the list animated using flip (recommended), specifies the flip duration such that everything syncs with it without conflict, defaults to zero
+     * @property {boolean} [dragDisabled]
+     * @property {boolean} [dropFromOthersDisabled]
+     * @property {Object} [dropTargetStyle]
+     * @property {Function} [transformDraggedElement]
+     * @param {HTMLElement} node - the element to enhance
+     * @param {Options} options
+     * @return {{update: function, destroy: function}}
+     */
+    function dndzone$2(node, options) {
+        validateOptions(options);
+        const pointerZone = dndzone(node, options);
+        const keyboardZone = dndzone$1(node, options);
+        return {
+            update: newOptions => {
+                validateOptions(newOptions);
+                pointerZone.update(newOptions);
+                keyboardZone.update(newOptions);
+            },
+            destroy: () => {
+                pointerZone.destroy();
+                keyboardZone.destroy();
+            }
+        };
+    }
+
+    function validateOptions(options) {
+        /*eslint-disable*/
+        const {
+            items,
+            flipDurationMs,
+            type,
+            dragDisabled,
+            dropFromOthersDisabled,
+            dropTargetStyle,
+            transformDraggedElement,
+            autoAriaDisabled,
+            ...rest
+        } = options;
+        /*eslint-enable*/
+        if (Object.keys(rest).length > 0) {
+            console.warn(`dndzone will ignore unknown options`, rest);
+        }
+        if (!items) {
+            throw new Error("no 'items' key provided to dndzone");
+        }
+        const itemWithMissingId = items.find(item => !{}.hasOwnProperty.call(item, ITEM_ID_KEY));
+        if (itemWithMissingId) {
+            throw new Error(`missing '${ITEM_ID_KEY}' property for item ${toString(itemWithMissingId)}`);
+        }
+    }
+
+    /* templates\components\Intersector.svelte generated by Svelte v3.30.0 */
+    const file$6 = "templates\\components\\Intersector.svelte";
+    const get_default_slot_changes = dirty => ({ intersecting: dirty & /*intersecting*/ 1 });
+    const get_default_slot_context = ctx => ({ intersecting: /*intersecting*/ ctx[0] });
+
+    function create_fragment$6(ctx) {
+    	let div;
+    	let current;
+    	const default_slot_template = /*#slots*/ ctx[8].default;
+    	const default_slot = create_slot(default_slot_template, ctx, /*$$scope*/ ctx[7], get_default_slot_context);
+
+    	const block = {
+    		c: function create() {
+    			div = element("div");
+    			if (default_slot) default_slot.c();
+    			attr_dev(div, "class", "svelte-1hzn8rv");
+    			add_location(div, file$6, 31, 0, 946);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div, anchor);
+
+    			if (default_slot) {
+    				default_slot.m(div, null);
+    			}
+
+    			/*div_binding*/ ctx[9](div);
+    			current = true;
+    		},
+    		p: function update(ctx, [dirty]) {
+    			if (default_slot) {
+    				if (default_slot.p && dirty & /*$$scope, intersecting*/ 129) {
+    					update_slot(default_slot, default_slot_template, ctx, /*$$scope*/ ctx[7], dirty, get_default_slot_changes, get_default_slot_context);
+    				}
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(default_slot, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(default_slot, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div);
+    			if (default_slot) default_slot.d(detaching);
+    			/*div_binding*/ ctx[9](null);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$6.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$6($$self, $$props, $$invalidate) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots("Intersector", slots, ['default']);
+    	let { once = false } = $$props;
+    	let { top = 0 } = $$props;
+    	let { bottom = 0 } = $$props;
+    	let { left = 0 } = $$props;
+    	let { right = 0 } = $$props;
+    	let intersecting = false;
+    	let container;
+
+    	onMount(() => {
+    		if (typeof IntersectionObserver !== "undefined") {
+    			const rootMargin = `${bottom}px ${left}px ${top}px ${right}px`;
+
+    			const observer = new IntersectionObserver(entries => {
+    					$$invalidate(0, intersecting = entries[0].isIntersecting);
+
+    					if (intersecting && once) {
+    						observer.unobserve(container);
+    					}
+    				},
+    			{ rootMargin });
+
+    			observer.observe(container);
+    			return () => observer.unobserve(container);
+    		}
+    	});
+
+    	const writable_props = ["once", "top", "bottom", "left", "right"];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Intersector> was created with unknown prop '${key}'`);
+    	});
+
+    	function div_binding($$value) {
+    		binding_callbacks[$$value ? "unshift" : "push"](() => {
+    			container = $$value;
+    			$$invalidate(1, container);
+    		});
+    	}
+
+    	$$self.$$set = $$props => {
+    		if ("once" in $$props) $$invalidate(2, once = $$props.once);
+    		if ("top" in $$props) $$invalidate(3, top = $$props.top);
+    		if ("bottom" in $$props) $$invalidate(4, bottom = $$props.bottom);
+    		if ("left" in $$props) $$invalidate(5, left = $$props.left);
+    		if ("right" in $$props) $$invalidate(6, right = $$props.right);
+    		if ("$$scope" in $$props) $$invalidate(7, $$scope = $$props.$$scope);
+    	};
+
+    	$$self.$capture_state = () => ({
+    		onMount,
+    		once,
+    		top,
+    		bottom,
+    		left,
+    		right,
+    		intersecting,
+    		container
+    	});
+
+    	$$self.$inject_state = $$props => {
+    		if ("once" in $$props) $$invalidate(2, once = $$props.once);
+    		if ("top" in $$props) $$invalidate(3, top = $$props.top);
+    		if ("bottom" in $$props) $$invalidate(4, bottom = $$props.bottom);
+    		if ("left" in $$props) $$invalidate(5, left = $$props.left);
+    		if ("right" in $$props) $$invalidate(6, right = $$props.right);
+    		if ("intersecting" in $$props) $$invalidate(0, intersecting = $$props.intersecting);
+    		if ("container" in $$props) $$invalidate(1, container = $$props.container);
+    	};
+
+    	if ($$props && "$$inject" in $$props) {
+    		$$self.$inject_state($$props.$$inject);
+    	}
+
+    	return [
+    		intersecting,
+    		container,
+    		once,
+    		top,
+    		bottom,
+    		left,
+    		right,
+    		$$scope,
+    		slots,
+    		div_binding
+    	];
+    }
+
+    class Intersector extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+
+    		init(this, options, instance$6, create_fragment$6, safe_not_equal, {
+    			once: 2,
+    			top: 3,
+    			bottom: 4,
+    			left: 5,
+    			right: 6
+    		});
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "Intersector",
+    			options,
+    			id: create_fragment$6.name
+    		});
+    	}
+
+    	get once() {
+    		throw new Error("<Intersector>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set once(value) {
+    		throw new Error("<Intersector>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get top() {
+    		throw new Error("<Intersector>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set top(value) {
+    		throw new Error("<Intersector>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get bottom() {
+    		throw new Error("<Intersector>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set bottom(value) {
+    		throw new Error("<Intersector>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get left() {
+    		throw new Error("<Intersector>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set left(value) {
+    		throw new Error("<Intersector>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get right() {
+    		throw new Error("<Intersector>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set right(value) {
+    		throw new Error("<Intersector>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+    }
+
+    /* templates\components\GalleryImage.svelte generated by Svelte v3.30.0 */
+    const file$7 = "templates\\components\\GalleryImage.svelte";
+
+    function get_each_context$1(ctx, list, i) {
+    	const child_ctx = ctx.slice();
+    	child_ctx[24] = list[i][0];
+    	child_ctx[25] = list[i][1];
+    	child_ctx[26] = list[i][2];
+    	child_ctx[27] = list[i][3];
+    	child_ctx[28] = list[i][4];
+    	child_ctx[29] = list[i][5];
+    	return child_ctx;
+    }
+
+    // (59:4) {#if !loaded}
+    function create_if_block$1(ctx) {
+    	let div;
+    	let svg;
+    	let g;
+    	let svg_viewBox_value;
+    	let div_class_value;
+    	let div_outro;
+    	let current;
+    	let if_block = !/*loaded*/ ctx[1] && create_if_block_1$1(ctx);
+    	let each_value = /*svgSequence*/ ctx[7];
+    	validate_each_argument(each_value);
+    	let each_blocks = [];
+
+    	for (let i = 0; i < each_value.length; i += 1) {
+    		each_blocks[i] = create_each_block$1(get_each_context$1(ctx, each_value, i));
+    	}
+
+    	const block = {
+    		c: function create() {
+    			div = element("div");
+    			svg = svg_element("svg");
+    			if (if_block) if_block.c();
+    			g = svg_element("g");
+
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				each_blocks[i].c();
+    			}
+
+    			add_location(g, file$7, 66, 16, 2320);
+    			attr_dev(svg, "xmlns", "http://www.w3.org/2000/svg");
+    			attr_dev(svg, "version", "1.1");
+    			attr_dev(svg, "width", "100%");
+    			attr_dev(svg, "height", "100%");
+    			attr_dev(svg, "viewBox", svg_viewBox_value = "0 0 " + /*svgWidth*/ ctx[2] + " " + /*svgHeight*/ ctx[8]);
+    			attr_dev(svg, "style", /*svgScale*/ ctx[10]);
+    			add_location(svg, file$7, 60, 12, 1947);
+    			attr_dev(div, "class", div_class_value = "" + (null_to_empty(/*photoSvgClass*/ ctx[9]) + " svelte-1lgp88u"));
+    			add_location(div, file$7, 59, 8, 1885);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div, anchor);
+    			append_dev(div, svg);
+    			if (if_block) if_block.m(svg, null);
+    			append_dev(svg, g);
+
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				each_blocks[i].m(g, null);
+    			}
+
+    			current = true;
+    		},
+    		p: function update(new_ctx, dirty) {
+    			ctx = new_ctx;
+
+    			if (!/*loaded*/ ctx[1]) {
+    				if (if_block) {
+    					if_block.p(ctx, dirty);
+
+    					if (dirty[0] & /*loaded*/ 2) {
+    						transition_in(if_block, 1);
+    					}
+    				} else {
+    					if_block = create_if_block_1$1(ctx);
+    					if_block.c();
+    					transition_in(if_block, 1);
+    					if_block.m(svg, g);
+    				}
+    			} else if (if_block) {
+    				group_outros();
+
+    				transition_out(if_block, 1, 1, () => {
+    					if_block = null;
+    				});
+
+    				check_outros();
+    			}
+
+    			if (dirty[0] & /*svgSequence*/ 128) {
+    				each_value = /*svgSequence*/ ctx[7];
+    				validate_each_argument(each_value);
+    				let i;
+
+    				for (i = 0; i < each_value.length; i += 1) {
+    					const child_ctx = get_each_context$1(ctx, each_value, i);
+
+    					if (each_blocks[i]) {
+    						each_blocks[i].p(child_ctx, dirty);
+    					} else {
+    						each_blocks[i] = create_each_block$1(child_ctx);
+    						each_blocks[i].c();
+    						each_blocks[i].m(g, null);
+    					}
+    				}
+
+    				for (; i < each_blocks.length; i += 1) {
+    					each_blocks[i].d(1);
+    				}
+
+    				each_blocks.length = each_value.length;
+    			}
+
+    			if (!current || dirty[0] & /*svgWidth, svgHeight*/ 260 && svg_viewBox_value !== (svg_viewBox_value = "0 0 " + /*svgWidth*/ ctx[2] + " " + /*svgHeight*/ ctx[8])) {
+    				attr_dev(svg, "viewBox", svg_viewBox_value);
+    			}
+
+    			if (!current || dirty[0] & /*svgScale*/ 1024) {
+    				attr_dev(svg, "style", /*svgScale*/ ctx[10]);
+    			}
+
+    			if (!current || dirty[0] & /*photoSvgClass*/ 512 && div_class_value !== (div_class_value = "" + (null_to_empty(/*photoSvgClass*/ ctx[9]) + " svelte-1lgp88u"))) {
+    				attr_dev(div, "class", div_class_value);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(if_block);
+    			if (div_outro) div_outro.end(1);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(if_block);
+    			div_outro = create_out_transition(div, fade, /*fadeSlow*/ ctx[13]);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div);
+    			if (if_block) if_block.d();
+    			destroy_each(each_blocks, detaching);
+    			if (detaching && div_outro) div_outro.end();
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_if_block$1.name,
+    		type: "if",
+    		source: "(59:4) {#if !loaded}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (63:16) {#if !loaded}
+    function create_if_block_1$1(ctx) {
+    	let rect;
+    	let rect_outro;
+    	let current;
+
+    	const block = {
+    		c: function create() {
+    			rect = svg_element("rect");
+    			attr_dev(rect, "x", "0");
+    			attr_dev(rect, "y", "0");
+    			attr_dev(rect, "width", /*svgWidth*/ ctx[2]);
+    			attr_dev(rect, "height", /*svgHeight*/ ctx[8]);
+    			attr_dev(rect, "fill", "#f0f0f0");
+    			add_location(rect, file$7, 63, 20, 2162);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, rect, anchor);
+    			current = true;
+    		},
+    		p: function update(new_ctx, dirty) {
+    			ctx = new_ctx;
+
+    			if (!current || dirty[0] & /*svgWidth*/ 4) {
+    				attr_dev(rect, "width", /*svgWidth*/ ctx[2]);
+    			}
+
+    			if (!current || dirty[0] & /*svgHeight*/ 256) {
+    				attr_dev(rect, "height", /*svgHeight*/ ctx[8]);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			if (rect_outro) rect_outro.end(1);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			rect_outro = create_out_transition(rect, fade, /*fadeQuick*/ ctx[14]);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(rect);
+    			if (detaching && rect_outro) rect_outro.end();
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_if_block_1$1.name,
+    		type: "if",
+    		source: "(63:16) {#if !loaded}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (68:20) {#each svgSequence as [ fill, opacity, cx, cy, rx, ry ] }
+    function create_each_block$1(ctx) {
+    	let ellipse;
+    	let ellipse_fill_value;
+    	let ellipse_fill_opacity_value;
+    	let ellipse_cx_value;
+    	let ellipse_cy_value;
+    	let ellipse_rx_value;
+    	let ellipse_ry_value;
+
+    	const block = {
+    		c: function create() {
+    			ellipse = svg_element("ellipse");
+    			attr_dev(ellipse, "fill", ellipse_fill_value = /*fill*/ ctx[24]);
+    			attr_dev(ellipse, "fill-opacity", ellipse_fill_opacity_value = /*opacity*/ ctx[25]);
+    			attr_dev(ellipse, "cx", ellipse_cx_value = /*cx*/ ctx[26]);
+    			attr_dev(ellipse, "cy", ellipse_cy_value = /*cy*/ ctx[27]);
+    			attr_dev(ellipse, "rx", ellipse_rx_value = /*rx*/ ctx[28]);
+    			attr_dev(ellipse, "ry", ellipse_ry_value = /*ry*/ ctx[29]);
+    			add_location(ellipse, file$7, 68, 24, 2428);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, ellipse, anchor);
+    		},
+    		p: function update(ctx, dirty) {
+    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_fill_value !== (ellipse_fill_value = /*fill*/ ctx[24])) {
+    				attr_dev(ellipse, "fill", ellipse_fill_value);
+    			}
+
+    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_fill_opacity_value !== (ellipse_fill_opacity_value = /*opacity*/ ctx[25])) {
+    				attr_dev(ellipse, "fill-opacity", ellipse_fill_opacity_value);
+    			}
+
+    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_cx_value !== (ellipse_cx_value = /*cx*/ ctx[26])) {
+    				attr_dev(ellipse, "cx", ellipse_cx_value);
+    			}
+
+    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_cy_value !== (ellipse_cy_value = /*cy*/ ctx[27])) {
+    				attr_dev(ellipse, "cy", ellipse_cy_value);
+    			}
+
+    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_rx_value !== (ellipse_rx_value = /*rx*/ ctx[28])) {
+    				attr_dev(ellipse, "rx", ellipse_rx_value);
+    			}
+
+    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_ry_value !== (ellipse_ry_value = /*ry*/ ctx[29])) {
+    				attr_dev(ellipse, "ry", ellipse_ry_value);
+    			}
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(ellipse);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_each_block$1.name,
+    		type: "each",
+    		source: "(68:20) {#each svgSequence as [ fill, opacity, cx, cy, rx, ry ] }",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function create_fragment$7(ctx) {
+    	let div1;
+    	let t0;
+    	let div0;
+    	let t1;
+    	let img;
+    	let img_src_value;
+    	let current;
+    	let mounted;
+    	let dispose;
+    	let if_block = !/*loaded*/ ctx[1] && create_if_block$1(ctx);
+
+    	const block = {
+    		c: function create() {
+    			div1 = element("div");
+    			if (if_block) if_block.c();
+    			t0 = space();
+    			div0 = element("div");
+    			t1 = space();
+    			img = element("img");
+    			attr_dev(div0, "class", "photo-spacer svelte-1lgp88u");
+    			attr_dev(div0, "style", /*spacerStyle*/ ctx[5]);
+    			add_location(div0, file$7, 75, 4, 2595);
+    			if (img.src !== (img_src_value = /*src*/ ctx[3])) attr_dev(img, "src", img_src_value);
+    			attr_dev(img, "srcset", /*srcset*/ ctx[4]);
+    			attr_dev(img, "alt", /*alt*/ ctx[6]);
+    			attr_dev(img, "class", "svelte-1lgp88u");
+    			toggle_class(img, "show", /*show*/ ctx[0]);
+    			add_location(img, file$7, 76, 4, 2649);
+    			attr_dev(div1, "class", "photo-inner-frame svelte-1lgp88u");
+    			add_location(div1, file$7, 56, 0, 1823);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div1, anchor);
+    			if (if_block) if_block.m(div1, null);
+    			append_dev(div1, t0);
+    			append_dev(div1, div0);
+    			append_dev(div1, t1);
+    			append_dev(div1, img);
+    			current = true;
+
+    			if (!mounted) {
+    				dispose = [
+    					listen_dev(img, "load", /*onImageLoad*/ ctx[12], false, false, false),
+    					listen_dev(img, "click", /*showPic*/ ctx[11], false, false, false)
+    				];
+
+    				mounted = true;
+    			}
+    		},
+    		p: function update(ctx, dirty) {
+    			if (!/*loaded*/ ctx[1]) {
+    				if (if_block) {
+    					if_block.p(ctx, dirty);
+
+    					if (dirty[0] & /*loaded*/ 2) {
+    						transition_in(if_block, 1);
+    					}
+    				} else {
+    					if_block = create_if_block$1(ctx);
+    					if_block.c();
+    					transition_in(if_block, 1);
+    					if_block.m(div1, t0);
+    				}
+    			} else if (if_block) {
+    				group_outros();
+
+    				transition_out(if_block, 1, 1, () => {
+    					if_block = null;
+    				});
+
+    				check_outros();
+    			}
+
+    			if (!current || dirty[0] & /*spacerStyle*/ 32) {
+    				attr_dev(div0, "style", /*spacerStyle*/ ctx[5]);
+    			}
+
+    			if (!current || dirty[0] & /*src*/ 8 && img.src !== (img_src_value = /*src*/ ctx[3])) {
+    				attr_dev(img, "src", img_src_value);
+    			}
+
+    			if (!current || dirty[0] & /*srcset*/ 16) {
+    				attr_dev(img, "srcset", /*srcset*/ ctx[4]);
+    			}
+
+    			if (!current || dirty[0] & /*alt*/ 64) {
+    				attr_dev(img, "alt", /*alt*/ ctx[6]);
+    			}
+
+    			if (dirty[0] & /*show*/ 1) {
+    				toggle_class(img, "show", /*show*/ ctx[0]);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(if_block);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(if_block);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div1);
+    			if (if_block) if_block.d();
+    			mounted = false;
+    			run_all(dispose);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$7.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$7($$self, $$props, $$invalidate) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots("GalleryImage", slots, []);
+
+    	let { viewLightbox = () => {
+    		
+    	} } = $$props;
+
+    	const showPic = () => {
+    		viewLightbox(fileName);
+    	};
+
+    	const srcSizes = [["tiny", "400w"], ["small", "600w"], ["medium", "1180w"]]; // ['large', '1700w']
+    	const getSrcSizes = fileName => ([size, width]) => getSizedPath(size, fileName) + " " + width;
+
+    	const getPadding = (width, height) => {
+    		if (height > width) {
+    			return "100%";
+    		}
+
+    		return (100 * height / width).toFixed(2) + "%";
+    	};
+
+    	let { imgData } = $$props;
+    	let { show } = $$props;
+    	let loaded = false;
+
+    	const onImageLoad = () => {
+    		$$invalidate(1, loaded = true);
+    	};
+
+    	const fadeSlow = { delay: 300, duration: 1600 };
+    	const fadeQuick = { delay: 200, duration: 600 };
+    	const writable_props = ["viewLightbox", "imgData", "show"];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<GalleryImage> was created with unknown prop '${key}'`);
+    	});
+
+    	$$self.$$set = $$props => {
+    		if ("viewLightbox" in $$props) $$invalidate(15, viewLightbox = $$props.viewLightbox);
+    		if ("imgData" in $$props) $$invalidate(16, imgData = $$props.imgData);
+    		if ("show" in $$props) $$invalidate(0, show = $$props.show);
+    	};
+
+    	$$self.$capture_state = () => ({
+    		fade,
+    		getSizedPath,
+    		dummyImage,
+    		viewLightbox,
+    		showPic,
+    		srcSizes,
+    		getSrcSizes,
+    		getPadding,
+    		imgData,
+    		show,
+    		loaded,
+    		onImageLoad,
+    		fadeSlow,
+    		fadeQuick,
+    		fileName,
+    		data,
+    		width,
+    		height,
+    		src,
+    		srcset,
+    		spacerStyle,
+    		alt,
+    		svgSequence,
+    		svgHeight,
+    		svgWidth,
+    		photoSvgClass,
+    		svgScale
+    	});
+
+    	$$self.$inject_state = $$props => {
+    		if ("viewLightbox" in $$props) $$invalidate(15, viewLightbox = $$props.viewLightbox);
+    		if ("imgData" in $$props) $$invalidate(16, imgData = $$props.imgData);
+    		if ("show" in $$props) $$invalidate(0, show = $$props.show);
+    		if ("loaded" in $$props) $$invalidate(1, loaded = $$props.loaded);
+    		if ("fileName" in $$props) $$invalidate(17, fileName = $$props.fileName);
+    		if ("data" in $$props) $$invalidate(18, data = $$props.data);
+    		if ("width" in $$props) $$invalidate(19, width = $$props.width);
+    		if ("height" in $$props) $$invalidate(20, height = $$props.height);
+    		if ("src" in $$props) $$invalidate(3, src = $$props.src);
+    		if ("srcset" in $$props) $$invalidate(4, srcset = $$props.srcset);
+    		if ("spacerStyle" in $$props) $$invalidate(5, spacerStyle = $$props.spacerStyle);
+    		if ("alt" in $$props) $$invalidate(6, alt = $$props.alt);
+    		if ("svgSequence" in $$props) $$invalidate(7, svgSequence = $$props.svgSequence);
+    		if ("svgHeight" in $$props) $$invalidate(8, svgHeight = $$props.svgHeight);
+    		if ("svgWidth" in $$props) $$invalidate(2, svgWidth = $$props.svgWidth);
+    		if ("photoSvgClass" in $$props) $$invalidate(9, photoSvgClass = $$props.photoSvgClass);
+    		if ("svgScale" in $$props) $$invalidate(10, svgScale = $$props.svgScale);
+    	};
+
+    	let data;
+    	let fileName;
+    	let width;
+    	let height;
+    	let src;
+    	let srcset;
+    	let spacerStyle;
+    	let alt;
+    	let svgSequence;
+    	let svgHeight;
+    	let svgWidth;
+    	let photoSvgClass;
+    	let svgScale;
+
+    	if ($$props && "$$inject" in $$props) {
+    		$$self.$inject_state($$props.$$inject);
+    	}
+
+    	$$self.$$.update = () => {
+    		if ($$self.$$.dirty[0] & /*imgData*/ 65536) {
+    			 $$invalidate(18, data = imgData || dummyImage);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 262144) {
+    			 $$invalidate(17, fileName = data.fileName);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 262144) {
+    			 $$invalidate(19, width = data.width);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 262144) {
+    			 $$invalidate(20, height = data.height);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*show, fileName*/ 131073) {
+    			 $$invalidate(3, src = show ? getSizedPath("small", fileName) : "");
+    		}
+
+    		if ($$self.$$.dirty[0] & /*show, fileName*/ 131073) {
+    			 $$invalidate(4, srcset = show
+    			? srcSizes.map(getSrcSizes(fileName)).join(",")
+    			: "");
+    		}
+
+    		if ($$self.$$.dirty[0] & /*width, height*/ 1572864) {
+    			 $$invalidate(5, spacerStyle = "padding: 0 0 " + getPadding(width, height) + " 0");
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 262144) {
+    			 $$invalidate(6, alt = data.description ? data.height.slice(0, 10) : "image");
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 262144) {
+    			 $$invalidate(7, svgSequence = data.svgSequence);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 262144) {
+    			 $$invalidate(8, svgHeight = data.svgHeight);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*data*/ 262144) {
+    			 $$invalidate(2, svgWidth = data.svgWidth);
+    		}
+
+    		if ($$self.$$.dirty[0] & /*loaded*/ 2) {
+    			 $$invalidate(9, photoSvgClass = "photo-svg" + (loaded ? " image-loaded" : ""));
+    		}
+
+    		if ($$self.$$.dirty[0] & /*svgWidth*/ 4) {
+    			 $$invalidate(10, svgScale = Number(svgWidth) === 256
+    			? ""
+    			: "transform: scale(" + (256 / Number(svgWidth)).toFixed(3) + ");");
+    		}
+    	};
+
+    	return [
+    		show,
+    		loaded,
+    		svgWidth,
+    		src,
+    		srcset,
+    		spacerStyle,
+    		alt,
+    		svgSequence,
+    		svgHeight,
+    		photoSvgClass,
+    		svgScale,
+    		showPic,
+    		onImageLoad,
+    		fadeSlow,
+    		fadeQuick,
+    		viewLightbox,
+    		imgData,
+    		fileName,
+    		data,
+    		width,
+    		height
+    	];
+    }
+
+    class GalleryImage extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$7, create_fragment$7, safe_not_equal, { viewLightbox: 15, imgData: 16, show: 0 }, [-1, -1]);
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "GalleryImage",
+    			options,
+    			id: create_fragment$7.name
+    		});
+
+    		const { ctx } = this.$$;
+    		const props = options.props || {};
+
+    		if (/*imgData*/ ctx[16] === undefined && !("imgData" in props)) {
+    			console.warn("<GalleryImage> was created without expected prop 'imgData'");
+    		}
+
+    		if (/*show*/ ctx[0] === undefined && !("show" in props)) {
+    			console.warn("<GalleryImage> was created without expected prop 'show'");
+    		}
+    	}
+
+    	get viewLightbox() {
+    		throw new Error("<GalleryImage>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set viewLightbox(value) {
+    		throw new Error("<GalleryImage>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get imgData() {
+    		throw new Error("<GalleryImage>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set imgData(value) {
+    		throw new Error("<GalleryImage>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get show() {
+    		throw new Error("<GalleryImage>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set show(value) {
+    		throw new Error("<GalleryImage>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+    }
+
+    /* templates\components\GalleryItem.svelte generated by Svelte v3.30.0 */
+    const file$8 = "templates\\components\\GalleryItem.svelte";
+
+    // (17:4) <Intersector once={true} let:intersecting={intersecting}>
+    function create_default_slot(ctx) {
+    	let galleryimage;
+    	let current;
+
+    	galleryimage = new GalleryImage({
+    			props: {
+    				viewLightbox: /*viewLightbox*/ ctx[1],
+    				imgData: /*imgData*/ ctx[0],
+    				show: /*intersecting*/ ctx[4]
+    			},
+    			$$inline: true
+    		});
+
+    	const block = {
+    		c: function create() {
+    			create_component(galleryimage.$$.fragment);
+    		},
+    		m: function mount(target, anchor) {
+    			mount_component(galleryimage, target, anchor);
+    			current = true;
+    		},
+    		p: function update(ctx, dirty) {
+    			const galleryimage_changes = {};
+    			if (dirty & /*viewLightbox*/ 2) galleryimage_changes.viewLightbox = /*viewLightbox*/ ctx[1];
+    			if (dirty & /*imgData*/ 1) galleryimage_changes.imgData = /*imgData*/ ctx[0];
+    			if (dirty & /*intersecting*/ 16) galleryimage_changes.show = /*intersecting*/ ctx[4];
+    			galleryimage.$set(galleryimage_changes);
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(galleryimage.$$.fragment, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(galleryimage.$$.fragment, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			destroy_component(galleryimage, detaching);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_default_slot.name,
+    		type: "slot",
+    		source: "(17:4) <Intersector once={true} let:intersecting={intersecting}>",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function create_fragment$8(ctx) {
+    	let div2;
+    	let intersector;
+    	let t0;
+    	let div1;
+    	let div0;
+    	let t1_value = (/*imgData*/ ctx[0].description || "Yo dawg.") + "";
+    	let t1;
+    	let div2_class_value;
+    	let current;
+
+    	intersector = new Intersector({
+    			props: {
+    				once: true,
+    				$$slots: {
+    					default: [
+    						create_default_slot,
+    						({ intersecting }) => ({ 4: intersecting }),
+    						({ intersecting }) => intersecting ? 16 : 0
+    					]
+    				},
+    				$$scope: { ctx }
+    			},
+    			$$inline: true
+    		});
+
+    	const block = {
+    		c: function create() {
+    			div2 = element("div");
+    			create_component(intersector.$$.fragment);
+    			t0 = space();
+    			div1 = element("div");
+    			div0 = element("div");
+    			t1 = text(t1_value);
+    			attr_dev(div0, "class", "original");
+    			add_location(div0, file$8, 20, 8, 647);
+    			attr_dev(div1, "class", "description-block svelte-yxfk3p");
+    			add_location(div1, file$8, 19, 4, 606);
+    			attr_dev(div2, "class", div2_class_value = "" + (null_to_empty(/*frameClass*/ ctx[2]) + " svelte-yxfk3p"));
+    			add_location(div2, file$8, 15, 0, 422);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div2, anchor);
+    			mount_component(intersector, div2, null);
+    			append_dev(div2, t0);
+    			append_dev(div2, div1);
+    			append_dev(div1, div0);
+    			append_dev(div0, t1);
+    			current = true;
+    		},
+    		p: function update(ctx, [dirty]) {
+    			const intersector_changes = {};
+
+    			if (dirty & /*$$scope, viewLightbox, imgData, intersecting*/ 51) {
+    				intersector_changes.$$scope = { dirty, ctx };
+    			}
+
+    			intersector.$set(intersector_changes);
+    			if ((!current || dirty & /*imgData*/ 1) && t1_value !== (t1_value = (/*imgData*/ ctx[0].description || "Yo dawg.") + "")) set_data_dev(t1, t1_value);
+
+    			if (!current || dirty & /*frameClass*/ 4 && div2_class_value !== (div2_class_value = "" + (null_to_empty(/*frameClass*/ ctx[2]) + " svelte-yxfk3p"))) {
+    				attr_dev(div2, "class", div2_class_value);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(intersector.$$.fragment, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(intersector.$$.fragment, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div2);
+    			destroy_component(intersector);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$8.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$8($$self, $$props, $$invalidate) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots("GalleryItem", slots, []);
+    	let { imgData } = $$props;
+    	let { mode } = $$props;
+    	let { viewLightbox = () => false } = $$props;
+    	const writable_props = ["imgData", "mode", "viewLightbox"];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<GalleryItem> was created with unknown prop '${key}'`);
+    	});
+
+    	$$self.$$set = $$props => {
+    		if ("imgData" in $$props) $$invalidate(0, imgData = $$props.imgData);
+    		if ("mode" in $$props) $$invalidate(3, mode = $$props.mode);
+    		if ("viewLightbox" in $$props) $$invalidate(1, viewLightbox = $$props.viewLightbox);
+    	};
+
+    	$$self.$capture_state = () => ({
+    		Intersector,
+    		GalleryImage,
+    		imgData,
+    		mode,
+    		viewLightbox,
+    		frameClass
+    	});
+
+    	$$self.$inject_state = $$props => {
+    		if ("imgData" in $$props) $$invalidate(0, imgData = $$props.imgData);
+    		if ("mode" in $$props) $$invalidate(3, mode = $$props.mode);
+    		if ("viewLightbox" in $$props) $$invalidate(1, viewLightbox = $$props.viewLightbox);
+    		if ("frameClass" in $$props) $$invalidate(2, frameClass = $$props.frameClass);
+    	};
+
+    	let frameClass;
+
+    	if ($$props && "$$inject" in $$props) {
+    		$$self.$inject_state($$props.$$inject);
+    	}
+
+    	$$self.$$.update = () => {
+    		if ($$self.$$.dirty & /*mode*/ 8) {
+    			// console.log('imgData', imgData);
+    			 $$invalidate(2, frameClass = "photo-frame" + " " + mode);
+    		}
+    	};
+
+    	return [imgData, viewLightbox, frameClass, mode];
+    }
+
+    class GalleryItem extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$8, create_fragment$8, safe_not_equal, { imgData: 0, mode: 3, viewLightbox: 1 });
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "GalleryItem",
+    			options,
+    			id: create_fragment$8.name
+    		});
+
+    		const { ctx } = this.$$;
+    		const props = options.props || {};
+
+    		if (/*imgData*/ ctx[0] === undefined && !("imgData" in props)) {
+    			console.warn("<GalleryItem> was created without expected prop 'imgData'");
+    		}
+
+    		if (/*mode*/ ctx[3] === undefined && !("mode" in props)) {
+    			console.warn("<GalleryItem> was created without expected prop 'mode'");
+    		}
+    	}
+
+    	get imgData() {
+    		throw new Error("<GalleryItem>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set imgData(value) {
+    		throw new Error("<GalleryItem>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get mode() {
+    		throw new Error("<GalleryItem>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set mode(value) {
+    		throw new Error("<GalleryItem>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get viewLightbox() {
+    		throw new Error("<GalleryItem>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set viewLightbox(value) {
+    		throw new Error("<GalleryItem>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+    }
+
+    /* templates\components\columns\ColumnDragDrop.svelte generated by Svelte v3.30.0 */
+
+    const { console: console_1$1 } = globals;
+    const file$9 = "templates\\components\\columns\\ColumnDragDrop.svelte";
+
+    function get_each_context$2(ctx, list, i) {
+    	const child_ctx = ctx.slice();
+    	child_ctx[13] = list[i];
+    	return child_ctx;
+    }
+
+    function get_each_context_1(ctx, list, i) {
+    	const child_ctx = ctx.slice();
+    	child_ctx[16] = list[i];
+    	return child_ctx;
+    }
+
+    // (108:12) {#each column.items as imgData(imgData.fileName)}
+    function create_each_block_1(key_1, ctx) {
+    	let div;
+    	let galleryitem;
+    	let rect;
+    	let stop_animation = noop;
+    	let current;
+
+    	galleryitem = new GalleryItem({
+    			props: {
+    				viewLightbox: GalleryStore.viewLightbox,
+    				imgData: /*imgData*/ ctx[16],
+    				mode: /*mode*/ ctx[0]
+    			},
+    			$$inline: true
+    		});
+
+    	const block = {
+    		key: key_1,
+    		first: null,
+    		c: function create() {
+    			div = element("div");
+    			create_component(galleryitem.$$.fragment);
+    			attr_dev(div, "class", "drag-animator");
+    			add_location(div, file$9, 108, 16, 3625);
+    			this.first = div;
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div, anchor);
+    			mount_component(galleryitem, div, null);
+    			current = true;
+    		},
+    		p: function update(ctx, dirty) {
+    			const galleryitem_changes = {};
+    			if (dirty & /*imageBatches*/ 2) galleryitem_changes.imgData = /*imgData*/ ctx[16];
+    			if (dirty & /*mode*/ 1) galleryitem_changes.mode = /*mode*/ ctx[0];
+    			galleryitem.$set(galleryitem_changes);
+    		},
+    		r: function measure() {
+    			rect = div.getBoundingClientRect();
+    		},
+    		f: function fix() {
+    			fix_position(div);
+    			stop_animation();
+    		},
+    		a: function animate() {
+    			stop_animation();
+    			stop_animation = create_animation(div, rect, flip, { duration: flipDurationMs });
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(galleryitem.$$.fragment, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(galleryitem.$$.fragment, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div);
+    			destroy_component(galleryitem);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_each_block_1.name,
+    		type: "each",
+    		source: "(108:12) {#each column.items as imgData(imgData.fileName)}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (102:4) {#each imageBatches as column(column.columnId)}
+    function create_each_block$2(key_1, ctx) {
+    	let div;
+    	let each_blocks = [];
+    	let each_1_lookup = new Map();
+    	let t;
+    	let dndzone_action;
+    	let current;
+    	let mounted;
+    	let dispose;
+    	let each_value_1 = /*column*/ ctx[13].items;
+    	validate_each_argument(each_value_1);
+    	const get_key = ctx => /*imgData*/ ctx[16].fileName;
+    	validate_each_keys(ctx, each_value_1, get_each_context_1, get_key);
+
+    	for (let i = 0; i < each_value_1.length; i += 1) {
+    		let child_ctx = get_each_context_1(ctx, each_value_1, i);
+    		let key = get_key(child_ctx);
+    		each_1_lookup.set(key, each_blocks[i] = create_each_block_1(key, child_ctx));
+    	}
+
+    	function consider_handler(...args) {
+    		return /*consider_handler*/ ctx[7](/*column*/ ctx[13], ...args);
+    	}
+
+    	function finalize_handler(...args) {
+    		return /*finalize_handler*/ ctx[8](/*column*/ ctx[13], ...args);
+    	}
+
+    	const block = {
+    		key: key_1,
+    		first: null,
+    		c: function create() {
+    			div = element("div");
+
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				each_blocks[i].c();
+    			}
+
+    			t = space();
+    			attr_dev(div, "class", "gallery-list svelte-15rvaw6");
+    			add_location(div, file$9, 102, 8, 3305);
+    			this.first = div;
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div, anchor);
+
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				each_blocks[i].m(div, null);
+    			}
+
+    			append_dev(div, t);
+    			current = true;
+
+    			if (!mounted) {
+    				dispose = [
+    					action_destroyer(dndzone_action = dndzone$2.call(null, div, {
+    						items: /*column*/ ctx[13].items,
+    						flipDurationMs
+    					})),
+    					listen_dev(div, "consider", consider_handler, false, false, false),
+    					listen_dev(div, "finalize", finalize_handler, false, false, false)
+    				];
+
+    				mounted = true;
+    			}
+    		},
+    		p: function update(new_ctx, dirty) {
+    			ctx = new_ctx;
+
+    			if (dirty & /*GalleryStore, imageBatches, mode*/ 3) {
+    				const each_value_1 = /*column*/ ctx[13].items;
+    				validate_each_argument(each_value_1);
+    				group_outros();
+    				for (let i = 0; i < each_blocks.length; i += 1) each_blocks[i].r();
+    				validate_each_keys(ctx, each_value_1, get_each_context_1, get_key);
+    				each_blocks = update_keyed_each(each_blocks, dirty, get_key, 1, ctx, each_value_1, each_1_lookup, div, fix_and_outro_and_destroy_block, create_each_block_1, t, get_each_context_1);
+    				for (let i = 0; i < each_blocks.length; i += 1) each_blocks[i].a();
+    				check_outros();
+    			}
+
+    			if (dndzone_action && is_function(dndzone_action.update) && dirty & /*imageBatches*/ 2) dndzone_action.update.call(null, {
+    				items: /*column*/ ctx[13].items,
+    				flipDurationMs
+    			});
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+
+    			for (let i = 0; i < each_value_1.length; i += 1) {
+    				transition_in(each_blocks[i]);
+    			}
+
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				transition_out(each_blocks[i]);
+    			}
+
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div);
+
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				each_blocks[i].d();
+    			}
+
+    			mounted = false;
+    			run_all(dispose);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_each_block$2.name,
+    		type: "each",
+    		source: "(102:4) {#each imageBatches as column(column.columnId)}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function create_fragment$9(ctx) {
+    	let div0;
+    	let t1;
+    	let div1;
+    	let each_blocks = [];
+    	let each_1_lookup = new Map();
+    	let div1_class_value;
+    	let current;
+    	let mounted;
+    	let dispose;
+    	let each_value = /*imageBatches*/ ctx[1];
+    	validate_each_argument(each_value);
+    	const get_key = ctx => /*column*/ ctx[13].columnId;
+    	validate_each_keys(ctx, each_value, get_each_context$2, get_key);
+
+    	for (let i = 0; i < each_value.length; i += 1) {
+    		let child_ctx = get_each_context$2(ctx, each_value, i);
+    		let key = get_key(child_ctx);
+    		each_1_lookup.set(key, each_blocks[i] = create_each_block$2(key, child_ctx));
+    	}
+
+    	const block = {
+    		c: function create() {
+    			div0 = element("div");
+    			div0.textContent = "XY";
+    			t1 = space();
+    			div1 = element("div");
+
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				each_blocks[i].c();
+    			}
+
+    			attr_dev(div0, "class", "toggle svelte-15rvaw6");
+    			add_location(div0, file$9, 99, 0, 3164);
+    			attr_dev(div1, "class", div1_class_value = "" + (null_to_empty(/*boardClass*/ ctx[2]) + " svelte-15rvaw6"));
+    			add_location(div1, file$9, 100, 0, 3218);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div0, anchor);
+    			insert_dev(target, t1, anchor);
+    			insert_dev(target, div1, anchor);
+
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				each_blocks[i].m(div1, null);
+    			}
+
+    			current = true;
+
+    			if (!mounted) {
+    				dispose = listen_dev(div0, "click", /*handleToggle*/ ctx[5], false, false, false);
+    				mounted = true;
+    			}
+    		},
+    		p: function update(ctx, [dirty]) {
+    			if (dirty & /*imageBatches, flipDurationMs, handleDndConsider, handleDndFinalize, GalleryStore, mode*/ 27) {
+    				const each_value = /*imageBatches*/ ctx[1];
+    				validate_each_argument(each_value);
+    				group_outros();
+    				validate_each_keys(ctx, each_value, get_each_context$2, get_key);
+    				each_blocks = update_keyed_each(each_blocks, dirty, get_key, 1, ctx, each_value, each_1_lookup, div1, outro_and_destroy_block, create_each_block$2, null, get_each_context$2);
+    				check_outros();
+    			}
+
+    			if (!current || dirty & /*boardClass*/ 4 && div1_class_value !== (div1_class_value = "" + (null_to_empty(/*boardClass*/ ctx[2]) + " svelte-15rvaw6"))) {
+    				attr_dev(div1, "class", div1_class_value);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+
+    			for (let i = 0; i < each_value.length; i += 1) {
+    				transition_in(each_blocks[i]);
+    			}
+
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				transition_out(each_blocks[i]);
+    			}
+
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div0);
+    			if (detaching) detach_dev(t1);
+    			if (detaching) detach_dev(div1);
+
+    			for (let i = 0; i < each_blocks.length; i += 1) {
+    				each_blocks[i].d();
+    			}
+
+    			mounted = false;
+    			dispose();
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$9.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    const flipDurationMs = 200;
+
+    function instance$9($$self, $$props, $$invalidate) {
+    	let $GalleryStore;
+    	validate_store(GalleryStore, "GalleryStore");
+    	component_subscribe($$self, GalleryStore, $$value => $$invalidate(6, $GalleryStore = $$value));
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots("ColumnDragDrop", slots, []);
+    	let mode = "single";
+    	let updateStoreTimer = null;
+
+    	const batchify = allImages => {
+    		// const source = [...allImages];
+    		const imageCount = allImages.length;
+
+    		const columns = Math.max(1, Math.floor(getDocWidth() / 180));
+    		const columnSize = Math.max(4, Math.ceil(allImages.length / columns));
+    		const batch = [];
+    		let index = 0;
+
+    		for (let i = 0; i < imageCount; i += columnSize) {
+    			batch.push({
+    				columnId: index,
+    				items: allImages.slice(i, i + columnSize)
+    			});
+
+    			index++;
+    		}
+
+    		console.log("columns", columns, "  columnSize", columnSize, "  Batch!", batch);
+    		return batch;
+    	};
+
+    	const updateStore = () => {
+    		const update = [];
+
+    		for (const batch of imageBatches) {
+    			for (const next of batch.items) {
+    				update.push(next);
+    			}
+    		}
+
+    		GalleryStore.updateImages(update);
+    	};
+
+    	function handleDndConsider(cId, e) {
+    		// GalleryStore.updateImages(e.detail.items);
+    		const index = imageBatches.findIndex(c => c.columnId === cId);
+
+    		console.log("CONSIDER cId", cId, " index", index);
+    		$$invalidate(1, imageBatches[index].items = e.detail.items, imageBatches);
+    		$$invalidate(1, imageBatches = [...imageBatches]);
+    	}
+
+    	function handleDndFinalize(cId, e) {
+    		// GalleryStore.updateImages(e.detail.items);
+    		const index = imageBatches.findIndex(c => c.columnId === cId);
+
+    		console.log("FINALIZE cId", cId, " index", index);
+    		$$invalidate(1, imageBatches[index].items = e.detail.items, imageBatches);
+    		$$invalidate(1, imageBatches = [...imageBatches]);
+    		clearTimeout(updateStoreTimer);
+    		updateStoreTimer = setTimeout(updateStore, 500);
+    	}
+
+    	const updateBatches = () => {
+    		setTimeout(
+    			() => {
+    				$$invalidate(1, imageBatches = batchify($GalleryStore.images));
+    			},
+    			100
+    		);
+    	};
+
+    	onMount(() => {
+    		window.addEventListener("resizeend", updateBatches);
+    	});
+
+    	/*
+    <div class="column-board">
+    {#each imageBatches as column(column.columnId)}
+        <div class="gallery-list" use:dndzone={{items: $GalleryStore.images, flipDurationMs}} 
+            on:consider="{handleDndConsider}" on:finalize="{handleDndFinalize}">
+            {#each $GalleryStore.images as imgData(imgData.fileName)}
+                <div class="drag-animator"  animate:flip="{{duration: flipDurationMs}}">
+                    <GalleryItem {imgData} />
+                </div>
+            {/each}
+        </div>
+    {/each}
+    </div>
+    */
+    	const handleToggle = () => {
+    		if (mode === "single") {
+    			$$invalidate(0, mode = "compact");
+    		} else {
+    			$$invalidate(0, mode = "single");
+    		}
+    	};
+
+    	const writable_props = [];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console_1$1.warn(`<ColumnDragDrop> was created with unknown prop '${key}'`);
+    	});
+
+    	const consider_handler = (column, e) => handleDndConsider(column.columnId, e);
+    	const finalize_handler = (column, e) => handleDndFinalize(column.columnId, e);
+
+    	$$self.$capture_state = () => ({
+    		onMount,
+    		flip,
+    		dndzone: dndzone$2,
+    		GalleryStore,
+    		GalleryItem,
+    		getDocWidth,
+    		flipDurationMs,
+    		mode,
+    		updateStoreTimer,
+    		batchify,
+    		updateStore,
+    		handleDndConsider,
+    		handleDndFinalize,
+    		updateBatches,
+    		handleToggle,
+    		imageBatches,
+    		$GalleryStore,
+    		boardClass
+    	});
+
+    	$$self.$inject_state = $$props => {
+    		if ("mode" in $$props) $$invalidate(0, mode = $$props.mode);
+    		if ("updateStoreTimer" in $$props) updateStoreTimer = $$props.updateStoreTimer;
+    		if ("imageBatches" in $$props) $$invalidate(1, imageBatches = $$props.imageBatches);
+    		if ("boardClass" in $$props) $$invalidate(2, boardClass = $$props.boardClass);
+    	};
+
+    	let imageBatches;
+    	let boardClass;
+
+    	if ($$props && "$$inject" in $$props) {
+    		$$self.$inject_state($$props.$$inject);
+    	}
+
+    	$$self.$$.update = () => {
+    		if ($$self.$$.dirty & /*$GalleryStore*/ 64) {
+    			 $$invalidate(1, imageBatches = batchify($GalleryStore.images));
+    		}
+
+    		if ($$self.$$.dirty & /*mode*/ 1) {
+    			 $$invalidate(2, boardClass = "column-board" + " " + mode);
+    		}
+    	};
+
+    	return [
+    		mode,
+    		imageBatches,
+    		boardClass,
+    		handleDndConsider,
+    		handleDndFinalize,
+    		handleToggle,
+    		$GalleryStore,
+    		consider_handler,
+    		finalize_handler
+    	];
+    }
+
+    class ColumnDragDrop extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$9, create_fragment$9, safe_not_equal, {});
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "ColumnDragDrop",
+    			options,
+    			id: create_fragment$9.name
+    		});
+    	}
+    }
+
+    /* templates\Album.svelte generated by Svelte v3.30.0 */
+    const file$a = "templates\\Album.svelte";
+
+    function create_fragment$a(ctx) {
+    	let main;
+    	let column;
+    	let t;
+    	let lightbox;
+    	let current;
+    	column = new ColumnDragDrop({ $$inline: true });
+    	lightbox = new Lightbox({ $$inline: true });
+
+    	const block = {
+    		c: function create() {
+    			main = element("main");
+    			create_component(column.$$.fragment);
+    			t = space();
+    			create_component(lightbox.$$.fragment);
+    			attr_dev(main, "class", "svelte-1dv8tjo");
+    			add_location(main, file$a, 6, 0, 201);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, main, anchor);
+    			mount_component(column, main, null);
+    			append_dev(main, t);
+    			mount_component(lightbox, main, null);
+    			current = true;
+    		},
+    		p: noop,
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(column.$$.fragment, local);
+    			transition_in(lightbox.$$.fragment, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(column.$$.fragment, local);
+    			transition_out(lightbox.$$.fragment, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(main);
+    			destroy_component(column);
+    			destroy_component(lightbox);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$a.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$a($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
     	validate_slots("Album", slots, []);
     	const writable_props = [];
@@ -3021,20 +8966,20 @@
     		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Album> was created with unknown prop '${key}'`);
     	});
 
-    	$$self.$capture_state = () => ({ GalleryStore, $GalleryStore });
-    	return [$GalleryStore];
+    	$$self.$capture_state = () => ({ Lightbox, Column: ColumnDragDrop });
+    	return [];
     }
 
     class Album extends SvelteComponentDev {
     	constructor(options) {
     		super(options);
-    		init(this, options, instance, create_fragment, safe_not_equal, {});
+    		init(this, options, instance$a, create_fragment$a, safe_not_equal, {});
 
     		dispatch_dev("SvelteRegisterComponent", {
     			component: this,
     			tagName: "Album",
     			options,
-    			id: create_fragment.name
+    			id: create_fragment$a.name
     		});
     	}
     }
@@ -3048,11 +8993,13 @@
 
         if (galleryData && galleryData.title) {
             document.title = galleryData.title;
+            const titleBar = document.querySelector('#headerBar .page-header-title');
+            titleBar.innerHTML = galleryData.title;
         }
 
         // eslint-disable-next-line no-unused-vars
         const app = new Album({
-            target: document.body,
+            target: document.getElementById('mainApp'),
             props: {}
         });
 

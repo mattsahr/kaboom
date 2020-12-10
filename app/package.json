@@ -15,10 +15,13 @@
     "rollup-plugin-livereload": "^2.0.0",
     "rollup-plugin-svelte": "^7.0.0",
     "rollup-plugin-terser": "^7.0.0",
-    "svelte": "^3.0.0"
+    "svelte": "^3.0.0",
+    "svelte-dnd-action": "^0.6.22"
   },
   "dependencies": {
     "lodash": "^4.17.20",
-    "sirv-cli": "^1.0.0"
+    "sirv-cli": "^1.0.0",
+    "svelte-lazy": "^1.0.7",
+    "svelte-zoom": "^1.0.12"
   }
 }

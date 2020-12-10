@@ -7,28 +7,110 @@
 
 	<link rel='icon' type='image/png' href='/favicon.png'>
 
+    <style>
+        html, body {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            background: #f0f0f0;
+            color: #505050;
+            line-height: 1.7;
+            font-size: 12px;
+            font-family: -apple-system, 
+                BlinkMacSystemFont, 
+                "Segoe UI", 
+                Roboto, 
+                Oxygen-Sans, 
+                Ubuntu, 
+                Cantarell, 
+                "Helvetica Neue", sans-serif;
+        }
+        div, span {
+            box-sizing: border-box;
+        }
+        .header-bar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: #e0e0e0;
+            margin-bottom: 1.4rem;
+            z-index: 200;
+            box-shadow: 0 2px 18px rgb(255 255 255 / 50%);
+            border: solid #c8c8c8;
+            border-width: 0 0 1px 0;
+        }
+        .header-column {
+            margin: 0 auto;
+            max-width: 1060px;
+            position: relative;
+            height: 36px;
+        }
+        ..menu-button {
+            width: 50px;
+            height: 50px;
+            position: absolute;
+            z-index: 10;
+            top: -6px;
+            left: 6px;
+            opacity: 0.6;
+            cursor: pointer;
+            font-size: 20px;
+        }
+        h1.page-header-title {
+            font-size: 1.6em;
+            margin: 0 0 0 50px;
+            font-weight: normal;
+            padding: 6px 0 0 0;
+            line-height: 1.2;
+        }
+        .menu-button:before {
+            position: absolute;
+            top: 50%;
+            left: .75em;
+            width: .8em;
+            height: .8em;
+            margin-top: -.4em;
+            transform: scale(1.4, 1);
+            content: '';
+            background-repeat: no-repeat;
+            background-size: contain;
+            opacity: 0.3;
+            background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHMAAABkCAMAAACCTv/3AAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAAZQTFRFAAAA5ubmSUUG+gAAAAJ0Uk5T/wDltzBKAAAAPklEQVR42uzYQQ0AAAgDseHfNC4IyVoD912WAACUm3uampqampqamq+aAAD+IVtTU1NTU1NT0z8EAFBsBRgAX+kR+Qam138AAAAASUVORK5CYII=);
+        }
+        #navApp { display: none; }
+    </style>
+
     <script type="text/javascript">
         "use strict";
-        (() => {
-            const composeStartCache = appName => {
+        (function() {
+            const composeStartCache = function(appName) {
                 const cache = {};
 
-                return source => payload => {
-                    if (source === 'app') {
-                        if (cache.data) {
-                            window[appName](cache.data);
-                        } else {
-                            cache.app = window[appName];    
+                return function (source) { 
+                    return function (payload) {
+                        if (source === 'app') {
+                            if (cache.data) {
+                                window[appName](cache.data);
+                            } else {
+                                cache.app = window[appName];    
+                            }
                         }
-                    }
 
-                    if (source === 'data') {
-                        if (cache.app) {
-                            cache.app(payload);
-                        } else {
-                            cache.data = payload;
+                        if (source === 'data') {
+                            if (cache.app) {
+                                cache.app(payload);
+                            } else {
+                                cache.data = payload;
+                            }
                         }
-                    }
+
+                    };
 
                 };
 
@@ -37,29 +119,55 @@
             const kickstart = composeStartCache('StartApp');
             const navstart = composeStartCache('NavApp');
 
-            const loadData = async () => {
-                const req = await fetch('album-meta.json');
-                if (req.status === 200) {
-                    const galleryData = await req.json();
-                    kickstart('data')(galleryData);
-                } else {
-                    console.error('Data Load Error: album-meta.json', req.status);
-                    console.log(req);
-                }
+            function makeRequest (method, url) {
+                return new Promise(function (resolve, reject) {
+                    var xhr = new XMLHttpRequest();
+                    xhr.open(method, url);
+                    xhr.onload = function () {
+                        if (this.status >= 200 && this.status < 300) {
+                            resolve(xhr.response);
+                        } else {
+                            reject({
+                                status: this.status,
+                                statusText: xhr.statusText
+                            });
+                        }
+                    };
+                    xhr.onerror = function () {
+                        reject({
+                            status: this.status,
+                            statusText: xhr.statusText
+                        });
+                    };
+                    xhr.send();
+                });
+            }
+
+            const loadData = function () {
+
+                makeRequest('GET', 'album-meta.json')
+                    .then(function (data) {
+                        const galleryData = JSON.parse(data);
+                        kickstart('data')(galleryData);
+                    })
+                    .catch(function (err) {
+                        console.error('Load album-meta.json: there was an error!', err.statusText);
+                    });
+
             };
 
-            const loadNavData = async () => {
-                const req = await fetch('../nav.json');
-                if (req.status === 200) {
-                    const navData = await req.json();
-                    navstart('data')(navData);
-                } else {
-                    console.error('Data Load Error: nav.json', req.status);
-                    console.log(req);
-                }
+            const loadNavData = function () {
+                makeRequest('GET', '../nav.json')
+                    .then(function (data) {
+                        const navData = JSON.parse(data);
+                        navstart('data')(navData);
+                    })
+                    .catch(function (err) {
+                        console.error('Load nav.json: there was an error!', err.statusText);
+                    });
             };
 
-            var loadScript = (src, callback) => {
+            var loadScript = function (src, callback) {
                 const fileRequest = document.createElement('script');
                 fileRequest.setAttribute('async', true);
                 fileRequest.setAttribute('type', "text/javascript");
@@ -68,12 +176,12 @@
                 document.getElementsByTagName("head")[0].appendChild(fileRequest);
             }
 
-            const loadApp = () => {
+            const loadApp = function () {
                 loadData();
                 loadScript('__app/album-app.js', kickstart('app'));
             };
 
-            const loadNav = () => {
+            const loadNav =function () {
                 loadNavData();
                 loadScript('__app/nav-app.js', navstart('app'));
             }
@@ -85,11 +193,18 @@
     </script>
 
     <!-- non-critical CSS, may load late -->
-    <link rel='stylesheet' href='__app/global.css' media="none" onload="if(media!='all')media='all'">
     <link rel='stylesheet' href='__app//bundle.css' media="none" onload="if(media!='all')media='all'">
 
 </head>
 
 <body>
+    <div id="headerBar" class="header-bar">
+        <div class="header-column">
+            <div class="menu-button" id="menu-button-01"></div>
+            <h1 class="page-header-title">Photo Album</h1>
+        </div>
+    </div>
+    <div id="mainApp"></div>
+    <div id="navApp"></div>
 </body>
 </html>

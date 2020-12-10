@@ -10,7 +10,7 @@ const createGalleryStore = () => {
     let GALLERY;
     subscribe(gallery => GALLERY = gallery);
 
-    const updateImages = (imageBatch) => {
+    const updateImages = imageBatch => {
         const updated = _cloneDeep(GALLERY);
         updated.images = imageBatch;
         set(updated);
@@ -51,10 +51,29 @@ const createGalleryStore = () => {
 
     };
 
+    const viewLightbox = fileName => {
+        const updated = _cloneDeep(GALLERY);
+        updated.current = fileName;
+        updated.active = true;
+
+        console.log('STORE', updated);
+
+        set(updated);
+    };
+
+    const closeLightbox = () => {
+        const updated = _cloneDeep(GALLERY);
+        updated.active = false;
+        set(updated);
+    };
+
     return {
         updateImages,
         getAllImages,
         loadFullJSON,
+
+        viewLightbox,
+        closeLightbox,
 
         subscribe,
         set,

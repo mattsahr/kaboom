@@ -10,11 +10,13 @@ const startApp = galleryData => {
 
     if (galleryData && galleryData.title) {
         document.title = galleryData.title;
+        const titleBar = document.querySelector('#headerBar .page-header-title');
+        titleBar.innerHTML = galleryData.title;
     }
 
     // eslint-disable-next-line no-unused-vars
     const app = new Album({
-        target: document.body,
+        target: document.getElementById('mainApp'),
         props: {}
     });
 

@@ -1,30 +1,22 @@
 <script>
-	import GalleryStore from './store/store';
+	// import GalleryStore from './store/store';
+	import Lightbox from './components/lightbox/Lightbox.svelte';
+	import Column from './components/columns/ColumnDragDrop.svelte';
 </script>
 
 <main>
-	<h1>Hello {$GalleryStore.title}!</h1>
-	<p>Visit the <a href="https://svelte.dev/tutorial">Svelte tutorial</a> to learn how to build Svelte apps.</p>
+	<Column />
+	<Lightbox />
 </main>
 
 <style>
 	main {
-		text-align: center;
-		padding: 1em;
-		max-width: 240px;
-		margin: 0 auto;
+	    padding: 72px 0 0 0;
 	}
 
-	h1 {
-		color: #ff3e00;
-		text-transform: uppercase;
-		font-size: 4em;
-		font-weight: 100;
-	}
-
-	@media (min-width: 640px) {
+    @media all and (max-width: 599px) {
 		main {
-			max-width: none;
+		    padding: 56px 0 0 0;
 		}
 	}
 </style>

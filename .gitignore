@@ -12,13 +12,16 @@ node_modules
 app/node_modules/
 
 ### Working Resources
+__resources/
 app/pages/__original/
 app/pages/microscopic/
 app/pages/tiny/
 app/pages/small/
 app/pages/medium/
 app/pages/large/
-app/pages/album-meta.json
+app/pages/png/
+app/pages/svg/
+app/pages/__app/album-app.js.map
 
 
 ### Gallery Data

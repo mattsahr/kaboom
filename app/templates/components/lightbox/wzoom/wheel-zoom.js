@@ -255,10 +255,10 @@ WZoom.prototype = {
         this._prepare();
     },
     zoomUp() {
-        this._zoom(-3);
+        this._zoom(-1);
     },
     zoomDown() {
-        this._zoom(3);
+        this._zoom(1);
     },
     destroy() {
         this.content.$element.style.transform = '';

@@ -1,0 +1,107 @@
+    <style>
+        html, body {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        body {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            background: #f0f0f0;
+            color: #505050;
+            line-height: 1.7;
+            font-size: 12px;
+            font-family: -apple-system, 
+                BlinkMacSystemFont, 
+                "Segoe UI", 
+                Roboto, 
+                Oxygen-Sans, 
+                Ubuntu, 
+                Cantarell, 
+                "Helvetica Neue", sans-serif;
+        }
+        div, span {
+            box-sizing: border-box;
+        }
+        .header-bar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: #e0e0e0;
+            margin-bottom: 1.4rem;
+            z-index: 200;
+            box-shadow: 0 2px 18px rgb(255 255 255 / 50%);
+            border: solid #c8c8c8;
+            border-width: 0 0 1px 0;
+        }
+        .header-column {
+            margin: 0 auto;
+            max-width: 1060px;
+            position: relative;
+            height: 36px;
+        }
+        h1.page-header-title {
+            font-size: 1.6em;
+            margin: 0 0 0 50px;
+            font-weight: normal;
+            padding: 6px 0 0 0;
+            line-height: 1.2;
+        }
+
+        /* #navApp { position: absolute; top: 0; left:0; } */
+
+        #startup-spinner-overlay {
+            position: fixed;
+            z-index: 1000;
+            background: rgb(250, 250, 250);
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 1;
+            transition: opacity 400ms;
+        }
+
+        .startup-spinner {
+            width: 50vmin;
+            height: 50vmin;
+            border-radius: 50%;
+            border: 4px solid #eee;
+        }
+ 
+        .startup-spinner:before {
+            content: '';
+            display: block;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+        }
+
+        @keyframes startupSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .startup-spinner:after {
+            content: '';
+            display: block;
+            width: 4px;
+            height: 27vmin;
+            background: orangered;
+            border-radius: 0px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            margin-left: -2px;
+            transform-origin: top center;
+            animation: startupSpin 4s linear infinite;
+        }
+  
+  
+
+    </style>

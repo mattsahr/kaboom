@@ -5,6 +5,8 @@
 
 const { exec } = require('child_process');
 
+const PROCESS_THREADS = 3; // use 3 process threads -- set to 0 to use all possible threads
+
 const shapes = {
     all: ' -m 0',
     triangle: ' -m 1',
@@ -21,7 +23,7 @@ const buildCommand = (sourcePath, destinationPath) =>
     'primitive' + 
     ' -i ' + sourcePath + 
     ' -o ' + destinationPath + 
-    ' -j 3' + // use 3 process threads
+    ' -j ' + PROCESS_THREADS + // use X process threads
     ' -a 0' + // let algorithm choose opacity 
     ' -bg F0F0F0' + // starting background is off white
     ' -s 256' + // size 256px output
@@ -29,16 +31,23 @@ const buildCommand = (sourcePath, destinationPath) =>
     shapes['ellipse'];
 
 const primitiveSVG = (sourcePath, destinationPath, successCallback) => {
-
     const command = buildCommand(sourcePath, destinationPath);
 
+    successCallback(destinationPath);
+
+    // eslint-disable-next-line no-unused-vars
     exec(command, (err, stdout, stderr) => {
         if (err) {
+            console.log('EXTERNAL DEPENDENCY: "primitive"');
+            console.log('https://github.com/fogleman/primitive');
+            console.log('primitive must be installed separately');
+
             console.error(err);
         } else {
             successCallback(destinationPath);
         }
     });
+
 };
 
 module.exports = primitiveSVG;

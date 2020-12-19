@@ -18,13 +18,22 @@ const commands = {
 
 const nConvert = (size, filepath, successCallback) => {
     const command = commands[size] + filepath;
+
+    successCallback(filepath);
+
+    // eslint-disable-next-line no-unused-vars
     exec(command, (err, stdout, stderr) => {
         if (err) {
+            console.log('EXTERNAL DEPENDENCY: "nconvert"');
+            console.log('https://www.xnview.com/en/nconvert/');
+            console.log('nconvert must be installed separately, and availabe in PATH');
+
             console.error(err);
         } else {
             successCallback(filepath);
         }
     });
+
 };
 
 module.exports = nConvert;

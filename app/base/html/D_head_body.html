@@ -1,0 +1,65 @@
+</head>
+<body>
+    <!-- non-critical CSS, may load late -->
+    <link rel='stylesheet' href='__app/__css_bundle_file_name__'  id="linkAppCSS" media="none">
+    <link rel='stylesheet' href='/bundle-nav.css' id="linkNavCSS" media="none">
+    <link rel='stylesheet' href='__app/__css_global_file_name__' id="linkGlobalCSS" media="none">
+
+    <script type="text/javascript">
+        (function(){
+            var cssTracker = {
+                app: false,
+                nav: false
+            };
+            var clearOverlay = function (arrival) {
+                cssTracker[arrival] = true;
+
+                if (cssTracker.app && cssTracker.nav) {
+                    var spinner = document.getElementById('startup-spinner-overlay');
+                    if (spinner) {
+                        spinner.style.opacity = '0';
+                        setTimeout(function(){
+                            spinner.parentNode.removeChild(spinner);
+                        }, 510);
+                    }
+                }
+
+            };
+
+            var linkApp = document.getElementById('linkAppCSS');
+            var linkNav = document.getElementById('linkNavCSS');
+            var linkGlobal = document.getElementById('linkGlobalCSS');
+
+            linkApp.onload = function() {
+                this.setAttribute('media', 'all');
+                clearOverlay('app');
+            }
+
+            linkNav.onload = function() {
+                this.setAttribute('media', 'all');
+                clearOverlay('nav');
+            }
+
+            linkGlobal.onload = function() {
+                // NOT REQUIRED -- DON'T PARTICIPATE IN OVERLAY CLEARING
+                this.setAttribute('media', 'all');
+            }
+
+        })();
+        
+    </script>
+
+    <div id="headerBar" class="header-bar">
+        <div class="header-column">
+            <div class="menu-button" id="menu-button-01"></div>
+            <h1 class="page-header-title">Photo Album</h1>
+        </div>
+    </div>
+
+    <div id="mainApp"></div>
+    <div id="navApp"></div>
+
+    <div id="startup-spinner-overlay"><div class="startup-spinner"></div></div>
+
+</body>
+</html>

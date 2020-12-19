@@ -1,9 +1,11 @@
 const fs = require( 'fs' );
 const path = require( 'path' );
 const { copyFile, replaceLastOrAdd } = require('../helpers/helpers.js');
-const nConvert = require('../helpers/n-convert.js');
-const primitive = require('../helpers/primitive.js');
-const collectMeta = require('../helpers/collect-meta.js');
+const nConvert = require('./n-convert.js');
+const primitive = require('./primitive.js');
+const hydrateJSON = require('../hydrate/hydrate-json.js');
+const hydrateNavJSON = require('../hydrate/hydrate-nav-json.js');
+
 const {
     DEFAULT_IMAGE_DIRECTORY,
     GALLERY_ACTIVE_PATH
@@ -14,8 +16,8 @@ const TRANSFORM_SIZES = {
     tiny: 'tiny',
     small: 'small',
     medium: 'medium',
-    large: 'large',
-    svg: 'svg'
+    large: 'large'
+    // svg: 'svg'
     // png: 'png'
 };
 
@@ -33,7 +35,7 @@ const transform = (size, source, destination, handleResults) => {
     copyFile(source, destination, handleCopyResults);
 };
 
-const batchTransform = async (size, remoteDir) => {
+const batchTransform = async (size, remoteDir, successCallback) => {
 
     if (size === 'svg') { return; }
 
@@ -49,19 +51,18 @@ const batchTransform = async (size, remoteDir) => {
     let totalToProcess = 0;
     const successes = [];
 
-    const handleTransformResults = (destination) => {
+    const handleTransformResults = destination => {
         successes.push(destination);
-        if (size === 'microscopic' && successes.length >= totalToProcess) {
-            console.log(' ');
-            console.log('---- Collect Data URI strings in a json file ----');
-            collectMeta(remoteDir, size, DEFAULT_IMAGE_DIRECTORY);
-        } else {
-            console.log(
-                size + ' conversion [ ' + 
-                (successes.length < 10 ? ('0' + successes.length) : successes.length) +
-                 ' ] of ' + 
-                totalToProcess + ':  ' 
-                + destination);
+
+        console.log(
+            size + ' conversion [ ' + 
+            (successes.length < 10 ? ('0' + successes.length) : successes.length) +
+             ' ] of ' + 
+            totalToProcess + ':  ' 
+            + destination);
+
+        if (successes.length >= totalToProcess) {
+            if (successCallback) { successCallback(size); }
         }
     };
 
@@ -86,8 +87,13 @@ const batchTransform = async (size, remoteDir) => {
     }
 };
 
-const buildSVG = async (albumPath) => {
+const buildSVG = async (albumPath, successCallback) => {
     const sourcePath = path.join(albumPath, DEFAULT_IMAGE_DIRECTORY);
+
+    console.log('BUILD SVG', sourcePath);
+    console.log('Be patient... SVG creation can take a while.');
+    console.log(' ');
+
     const sourceImages = await fs.promises.readdir(sourcePath);
 
     const toProcess = [];
@@ -95,15 +101,24 @@ const buildSVG = async (albumPath) => {
     let finished = 0;
 
     const handleConversionResults = (destination) => {
-        finished++;
-        if (finished >= total) {
-            console.log(' ');
-            console.log('---- Collect SVG strings in a json file ----');
-            collectMeta(albumPath, 'svg', DEFAULT_IMAGE_DIRECTORY);
-        } else {
+        if (destination) {
+            finished++;
             console.log(
                 'SVG [ ' + finished + ' ] of ' + total + ':  ' + destination
             );
+        }
+
+        if (toProcess.length) {
+            const imagePath = toProcess.shift();
+            const fromPath = path.join(sourcePath, imagePath);
+            const svgFile = replaceLastOrAdd(imagePath, '.jpg', '.svg');
+            const destinationPath = path.join(albumPath, 'svg', svgFile);
+
+            primitive(fromPath, destinationPath, handleConversionResults);
+        } else {
+            console.log(albumPath, ' ');
+            console.log(albumPath, '-- all SVG images complete');
+            successCallback(albumPath);
         }
     };    
 
@@ -117,28 +132,44 @@ const buildSVG = async (albumPath) => {
        }
     }
 
-    while(toProcess.length) {
-        const imagePath = toProcess.shift();
-        const fromPath = path.join(sourcePath, imagePath);
-
-        const svgFile = replaceLastOrAdd(imagePath, '.jpg', '.svg');
-        const destinationPath = path.join(albumPath, 'svg', svgFile);
-
-        primitive(fromPath, destinationPath, handleConversionResults);
-    }
+    handleConversionResults();
 };
 
-const albumTransform = async albumPath => {
-    for (const size of Object.values(TRANSFORM_SIZES)) {
-        batchTransform(size, albumPath);
-    }
-    buildSVG(albumPath);
+const albumTransform = async (albumPath, successCallback) => {
+
+    const sizes = Object.values(TRANSFORM_SIZES);
+    let svgBuildCalled = false;
+
+    const transformNext = (priorSize) => {
+        if (priorSize) {
+            console.log(albumPath, priorSize, 'conversions complete');
+        }
+
+        if (sizes.length) {
+            const next = sizes.shift();
+            batchTransform(next, albumPath, transformNext);
+
+        } else {
+            if (!svgBuildCalled) {
+                svgBuildCalled = true;
+
+                console.log(' ');
+                console.log(albumPath, 'ALL CONVERSIONS COMPLETE');
+                console.log(' ');
+
+                buildSVG(albumPath, successCallback);      
+            }
+        }
+    };
+
+    transformNext();
+
 };
 
 
 const processActiveImages = (() => {
 
-    const surveyAlbum = async (albumPath, successCallback) => {
+    const surveyAlbum = async (albumPath, successCallback, finalCallback) => {
 
         const topItems = await fs.promises.readdir(albumPath);
         const originalPath = path.join(albumPath, DEFAULT_IMAGE_DIRECTORY);
@@ -162,25 +193,64 @@ const processActiveImages = (() => {
         }
 
         const fullItems = await fs.promises.readdir(albumPath);
-        console.log('--- all directories ---', albumPath);
+        console.log(albumPath, '---- all directories ----');
         for (const item of fullItems) {
-            console.log(item);
+            console.log('    ' + item);
         }
+        console.log('---- ---- ----');
+        console.log('  ');
 
-        successCallback(albumPath);
+        if (successCallback) { 
+            successCallback(albumPath, finalCallback);
+        }
+    };
+
+
+
+    const buildAlbumConversionSuccess = allAlbums => {  
+
+        const finished = [];
+
+        const jsonSuccess = (albumPath) => {
+            finished.push(albumPath);
+            if (finished.length >= allAlbums.length) {
+                console.log(' ');
+                console.log('---- All "album-meta.json" files processed ----');
+                console.log('---- Building Nav JSON ----');
+                hydrateNavJSON();
+            }
+        };
+
+        return albumPath => {
+            console.log(' ');
+            console.log('---- ' + albumPath + ' --- Collect all metadata in a json file ----');
+            hydrateJSON(albumPath, 'svg', DEFAULT_IMAGE_DIRECTORY, jsonSuccess);
+        };
     };
 
     return async galleryPath => {
         const workingPath = galleryPath || GALLERY_ACTIVE_PATH;
         const gallery = await fs.promises.readdir(workingPath);
 
+        const albums = [];
         for (const item of gallery) {
             const albumPath = path.join(workingPath, item);
             const stat = await fs.promises.stat(albumPath);
             if (stat.isDirectory()) {
-                surveyAlbum(albumPath, albumTransform);
+                albums.push(albumPath);
             }
         }
+
+        const conversionSuccess = buildAlbumConversionSuccess(albums);
+
+        for (const item of gallery) {
+            const albumPath = path.join(workingPath, item);
+            const stat = await fs.promises.stat(albumPath);
+            if (stat.isDirectory()) {
+                surveyAlbum(albumPath, albumTransform, conversionSuccess);
+            }
+        }
+
     };
 
 })();

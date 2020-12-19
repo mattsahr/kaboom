@@ -4,22 +4,36 @@ const Jimp = require('jimp');
 // const potrace = require('potrace');
 // const SVGO = require('svgo');
 // const { SVGO_PARAMS } = require('../constants.js');
-const { checkFile, replaceLastOrAdd } = require('./helpers.js');
+const { checkFile, replaceLastOrAdd } = require('../helpers/helpers.js');
 
 
-const saveMeta = (albumMeta, saveDirectory) => {
+const saveMeta = async (albumMeta, saveDirectory, successCallback) => {
+
     const json = JSON.stringify(albumMeta);
-
     const filePath = saveDirectory
         ? path.join(saveDirectory, 'album-meta.json')
         : 'album-meta.json';
     
+    await fs.promises.writeFile(filePath, json);
+
+
+    console.log(' ');
+    console.log('saved: ' + filePath);
+    if (successCallback) {
+        successCallback(saveDirectory);
+    }
+
+    /*
     fs.writeFile(filePath, json, (err) => {
         if (!err) {
             console.log(' ');
             console.log('saved: ' + filePath);
-        }
+            if (successCallback) {
+                successCallback(saveDirectory);
+            }
+        } 
     });
+    */
 };
 
 const endBracket = /\/>/g;
@@ -35,7 +49,7 @@ const svgToData = data => {
     dimensions = dimensions.split('" height="');
     const width = dimensions[0];
     const height = dimensions[1].split('">')[0];
-    console.log('---- width', width, ' height', height);
+    // console.log('---- width', width, ' height', height);
 
     for (const next of circles) {
         const prepped = next
@@ -56,10 +70,11 @@ const svgToData = data => {
     return { height, width, sequence };
 };
 
-const collectMeta = async (albumDirectory, size, originals) => {
+const hydrateJSON = async (albumDirectory, size, originals, successCallback) => {
     
     let albumMeta = {
-        images: []
+        images: [],
+        url: albumDirectory.split('/').pop()
     };
 
     const metaPath = path.join(albumDirectory, 'album-meta.json');
@@ -69,15 +84,8 @@ const collectMeta = async (albumDirectory, size, originals) => {
     if (gotAlbumMeta) {
         albumMeta = await fs.promises.readFile(metaPath, 'utf8');
         albumMeta = JSON.parse(albumMeta);
-
         console.log('already got albumMeta!');
-
-        for (const image of albumMeta.images) {
-            if (image.description) {
-                console.log(image.fileName, image.description);
-            }
-        }
-
+        albumMeta.url = albumDirectory.split('/').pop();
     } 
 
     const imageDirectory = path.join(albumDirectory, size);
@@ -96,7 +104,10 @@ const collectMeta = async (albumDirectory, size, originals) => {
 
             const svgData = await fs.promises.readFile(fromPath, 'utf8');
             const { height, width, sequence } = svgToData(svgData);
-            console.log(fromPath, 'svgSequence', JSON.stringify(sequence).length);
+            console.log(albumDirectory, fileName, 
+                'svgSequence [' + count + '] of ' + total + ' | size:', 
+                JSON.stringify(sequence).length
+            );
 
             const baseFileName = replaceLastOrAdd(fileName, size, 'jpg');
             const original = await Jimp.read(path.join(originalDirectory, baseFileName));
@@ -104,23 +115,24 @@ const collectMeta = async (albumDirectory, size, originals) => {
             const currentMeta = albumMeta.images.find(next => next.fileName === baseFileName);
 
             if (currentMeta) {
+                currentMeta.id = baseFileName;
+
                 currentMeta.width = original.bitmap.width;
                 currentMeta.height = original.bitmap.height;
 
-                delete currentMeta.dataURI;
-                delete currentMeta.svg;
-                delete currentMeta.svgString;
                 currentMeta.svgSequence = sequence;
                 currentMeta.svgHeight = height;
                 currentMeta.svgWidth = width;
 
             } else {
                 const nextImage = {
-                    fileName: baseFileName,
                     id: baseFileName,
+                    fileName: baseFileName,
+
                     width: original.bitmap.width,
                     height: original.bitmap.height,
-                    title: currentMeta,
+
+                    title: baseFileName,
                     description: '',
                     svgSequence: sequence,
                     svgHeight: height,
@@ -134,10 +146,10 @@ const collectMeta = async (albumDirectory, size, originals) => {
         }
 
         if (count >= total) {
-            saveMeta(albumMeta, albumDirectory);
+            saveMeta(albumMeta, albumDirectory, successCallback);
         }
     }
 
 };
 
-module.exports = collectMeta;
+module.exports = hydrateJSON;

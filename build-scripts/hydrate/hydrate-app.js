@@ -61,17 +61,16 @@ const writeToAlbums = async (albumRoot, fileName, file, successCallback) => {
     }
 };
 
-const hydrateAppFile = fileName => async successCallback => {
+const hydrateAppFile = (fileName, albumsPath) => async successCallback => {
 
     const filePath = path.join('__app/', fileName);
     const sourcePath = path.join(APP_DIRECTORY, filePath);
     const file = await fs.promises.readFile(sourcePath, 'utf8');
 
-    const firstBatchCallBack = () => {
-        writeToAlbums(GALLERY_STATIC_PATH, filePath, file, successCallback);
-    };
-    writeToAlbums(GALLERY_ACTIVE_PATH, filePath, file, firstBatchCallBack);
+    writeToAlbums(albumsPath, filePath, file, successCallback);
 };
+
+
 
 const hydrateHTML = async (successCallback) => {
 
@@ -90,14 +89,25 @@ const hydrateHTML = async (successCallback) => {
     const indexHtml = await fs.promises.readFile(source, 'utf8');
     const minified = minify(indexHtml, minProps);
 
-    const firstBatchCallBack = () => {
-        writeToAlbums(GALLERY_STATIC_PATH, 'index.html', minified, successCallback);
+    const firstBatchCallBack = async () => {
+
+        const sourceBasic = path.join(APP_DIRECTORY, 'basic.html');
+        const basicHtml = await fs.promises.readFile(sourceBasic, 'utf8');
+        const minifiedBasic = minify(basicHtml, minProps);
+
+        writeToAlbums(GALLERY_STATIC_PATH, 'index.html', minifiedBasic, successCallback);
     };
+
     writeToAlbums(GALLERY_ACTIVE_PATH, 'index.html', minified, firstBatchCallBack);
 };
 
-const hydrateAlbumApp = hydrateAppFile('album-app.js');
-const hydateAlbumCss = hydrateAppFile('bundle.css');
+const app =             hydrateAppFile('album-app.js', GALLERY_ACTIVE_PATH);
+const appCSS =          hydrateAppFile('bundle.css', GALLERY_ACTIVE_PATH);
+const appGlobalCSS =    hydrateAppFile('global.css', GALLERY_ACTIVE_PATH);
+
+const basic =           hydrateAppFile('album-basic.js', GALLERY_STATIC_PATH);
+const basicCSS =        hydrateAppFile('bundle-basic.css', GALLERY_STATIC_PATH);
+const basicGlobalCSS =  hydrateAppFile('global-basic.css', GALLERY_STATIC_PATH);
 
 const hydrateApp = (() => {
 
@@ -105,9 +115,15 @@ const hydrateApp = (() => {
 
         waitSerial(
             {
-               hydrateHTML,
-               hydrateAlbumApp,
-               hydateAlbumCss
+                hydrateHTML,
+
+                app,
+                appCSS,
+                appGlobalCSS,
+
+                basic,
+                basicCSS,
+                basicGlobalCSS
             },
             successCallback,
             'REPORT'

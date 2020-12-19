@@ -1,0 +1,117 @@
+    <script type="text/javascript">
+        "use strict";
+
+        const APP_FILE_NAME = '__app_file_name__';
+        const NETWORK_API_FILE_NAME = '__API_file_name__';
+
+        (function() {
+            const composeStartCache = function(appName) {
+                const cache = {};
+
+                return function (source) { 
+                    return function (payload) {
+                        if (source === 'app') {
+                            if (cache.data) {
+                                window[appName](cache.data);
+                            } else {
+                                cache.app = window[appName];    
+                            }
+                        }
+
+                        if (source === 'data') {
+                            if (cache.app) {
+                                cache.app(payload);
+                            } else {
+                                cache.data = payload;
+                            }
+                        }
+
+                    };
+
+                };
+
+            };
+
+            const kickstart = composeStartCache('StartApp');
+            const navstart = composeStartCache('NavApp');
+
+            function makeRequest (method, url) {
+                return new Promise(function (resolve, reject) {
+                    var xhr = new XMLHttpRequest();
+                    xhr.open(method, url);
+                    xhr.onload = function () {
+                        if (this.status >= 200 && this.status < 300) {
+                            resolve(xhr.response);
+                        } else {
+                            reject({
+                                status: this.status,
+                                statusText: xhr.statusText
+                            });
+                        }
+                    };
+                    xhr.onerror = function () {
+                        reject({
+                            status: this.status,
+                            statusText: xhr.statusText
+                        });
+                    };
+                    xhr.send();
+                });
+            }
+
+            const loadData = function () {
+
+                makeRequest('GET', 'album-meta.json')
+                    .then(function (data) {
+                        const galleryData = JSON.parse(data);
+                        kickstart('data')(galleryData);
+                    })
+                    .catch(function (err) {
+                        console.error('Load album-meta.json: there was an error!', err.statusText);
+                    });
+
+            };
+
+            const loadNavData = function () {
+                makeRequest('GET', '/nav-meta.json')
+                    .then(function (data) {
+                        const navData = JSON.parse(data);
+                        navstart('data')(navData);
+                    })
+                    .catch(function (err) {
+                        console.error('Load nav.json: there was an error!', err.statusText);
+                    });
+            };
+
+            var loadScript = function (src, callback) {
+                const fileRequest = document.createElement('script');
+                fileRequest.setAttribute('async', true);
+                fileRequest.setAttribute('type', "text/javascript");
+                fileRequest.setAttribute('src', src);
+                fileRequest.onload = callback;
+                document.getElementsByTagName("head")[0].appendChild(fileRequest);
+            }
+
+            const loadApp = function () {
+                loadData();
+                loadScript('__app/' + APP_FILE_NAME, kickstart('app'));
+            };
+
+            const loadNav =function () {
+                loadNavData();
+
+                if (NETWORK_API_FILE_NAME) { 
+                    loadScript('/' + NETWORK_API_FILE_NAME);
+                } else {
+                    console.log('NO NETWORK_API_FILE_NAME');
+                }
+
+                loadScript('/nav-app.js', navstart('app'));
+
+            }
+
+            loadApp();
+            setTimeout(loadNav, 500);
+
+        })();
+    </script>

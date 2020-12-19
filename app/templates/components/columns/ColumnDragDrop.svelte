@@ -3,13 +3,12 @@
     import { flip } from "svelte/animate";
     import { dndzone } from "svelte-dnd-action";
     import GalleryStore from '../../store/store';
-    import GalleryItem from '../GalleryItem.svelte';
+    import GalleryItem from '../gallery/GalleryItem.svelte';
     import { getDocWidth } from '../../utility/dom';
+    import MdShuffle from 'svelte-icons/md/MdShuffle.svelte';
 
     const flipDurationMs = 200;
-
     let mode = 'single';
-    let updateStoreTimer = null;
 
     const batchify = (allImages) => {
         // const source = [...allImages];
@@ -25,7 +24,7 @@
             index++;
         }
 
-        console.log('columns', columns, '  columnSize', columnSize, '  Batch!', batch);
+        // console.log('columns', columns, '  columnSize', columnSize, '  Batch!', batch);
         return batch;
     };
 
@@ -43,23 +42,15 @@
     };
 
     function handleDndConsider(cId, e) {
-        // GalleryStore.updateImages(e.detail.items);
-
         const index = imageBatches.findIndex(c => c.columnId === cId);
-        console.log('CONSIDER cId', cId, ' index', index);
         imageBatches[index].items = e.detail.items;
         imageBatches = [...imageBatches];        
     }
 
     function handleDndFinalize(cId, e) {
-        // GalleryStore.updateImages(e.detail.items);
         const index = imageBatches.findIndex(c => c.columnId === cId);
-        console.log('FINALIZE cId', cId, ' index', index);
         imageBatches[index].items = e.detail.items;
         imageBatches = [...imageBatches]; 
-
-        clearTimeout(updateStoreTimer);
-        updateStoreTimer = setTimeout(updateStore, 500);
     }
 
     const updateBatches = () => {
@@ -72,84 +63,88 @@
         window.addEventListener('resizeend', updateBatches);
     });
 
-    /*
-    <div class="column-board">
-    {#each imageBatches as column(column.columnId)}
-        <div class="gallery-list" use:dndzone={{items: $GalleryStore.images, flipDurationMs}} 
-            on:consider="{handleDndConsider}" on:finalize="{handleDndFinalize}">
-            {#each $GalleryStore.images as imgData(imgData.fileName)}
-                <div class="drag-animator"  animate:flip="{{duration: flipDurationMs}}">
-                    <GalleryItem {imgData} />
-                </div>
-            {/each}
-        </div>
-    {/each}
-</div>
-    */
-
-const handleToggle = () => {
-    if (mode === 'single') {
-        mode =  'compact';
-    } else {
-        mode = 'single';
-    }
-};
+    const handleToggle = () => {
+        if (mode === 'single') {
+            mode = 'arrange';
+        } else {
+            updateStore();
+            mode = 'single';
+        }
+    };
 
 </script>
 
-<div class="toggle" on:click={handleToggle}>XY</div>
+<!-- ====================================== HTML =============================================== -->
+
+
+<div class="arrange-toggle" on:click={handleToggle}><MdShuffle /></div>
 <div class={boardClass}>
-    {#each imageBatches as column(column.columnId)}
-        <div class="gallery-list" 
-            use:dndzone={{items: column.items, flipDurationMs}}
-            on:consider={(e) => handleDndConsider(column.columnId, e)} 
-            on:finalize={(e) => handleDndFinalize(column.columnId, e)}>
+        {#each imageBatches as column(column.columnId)}
+            {#if column.items && column.items.length}
+                <div class="gallery-list" 
+                    use:dndzone={{items: column.items, flipDurationMs, dragDisabled: mode !== 'arrange'}}
+                    on:consider={(e) => handleDndConsider(column.columnId, e)} 
+                    on:finalize={(e) => handleDndFinalize(column.columnId, e)}>
 
-            {#each column.items as imgData(imgData.fileName)}
-                <div class="drag-animator"  animate:flip="{{duration: flipDurationMs}}">
-                    <GalleryItem viewLightbox={GalleryStore.viewLightbox} {imgData} {mode} />
+
+                    {#each column.items as imgData(imgData.fileName)}
+                        <div class="drag-animator"  animate:flip="{{duration: flipDurationMs}}">
+                            <GalleryItem {imgData} {mode}
+                                updateDescription={GalleryStore.updateDescription}
+                                viewLightbox={GalleryStore.viewLightbox}  />
+                        </div>
+                    {/each}
+
                 </div>
-            {/each}
-
-        </div>
-    {/each}
+            {/if}
+        {/each}
 </div>
 
+
+<!-- ====================================== STYLES ============================================= -->
 <style>
     .column-board {
     }
 
-    .toggle {
-        top: 42px;
+    .arrange-toggle {
+        top: 2px;
         right: 6px;
         height: 32px;
         width: 32px;
         position: fixed;
-        z-index: 20;
+        z-index: 400;
+        padding: 0;
+        color: rgb(190, 190, 190);
         border: solid rgb(200, 200, 200);
         border-width: 2px;
-        padding: 4px 0 0 8px;
         cursor: pointer;
         border-radius: 4px;
     }
-    .toggle:hover {
-        background-color: rgb(240, 230, 220);
+    .arrange-toggle:hover {
+        background-color: rgb(240, 240, 240);
     }
 
-    .column-board.compact {
+    .column-board.arrange {
         display: flex;
         overflow-y: scroll;
     }
     .gallery-list {
         margin: 0 auto;
-        max-width: 560px;
+        max-width: 1060px;
         padding: 0;
         width: 100%;
     }
-    .column-board.compact .gallery-list {
-        margin: 0;
-        border: solid rgb(180, 180, 180);
-        border-width: 0 3px 0 3px;
 
+    .column-board.arrange .gallery-list {
+        margin: 0 4px 0 4px;
+        box-shadow: 2px 2px 10px rgb(0, 0, 0, 0.5);
     }
+
+    @media all and (min-width: 1080px) {
+        .arrange-toggle {
+            right: 50%;
+            margin-right: -520px;
+        }
+    }
+
 </style>

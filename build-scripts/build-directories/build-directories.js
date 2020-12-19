@@ -39,6 +39,8 @@ const buildDirectories = (() => {
             if (stat.isDirectory()) { staticAlbums.push(albumPath); }
         }
 
+        console.log('staticAlbums', staticAlbums.length);
+
         if (staticAlbums.length === 0) {
 
             const galleryActiveNames = await fs.promises.readdir(GALLERY_ACTIVE_PATH);
@@ -48,6 +50,8 @@ const buildDirectories = (() => {
                 const stat = await fs.promises.stat(albumPath);
                 if (stat.isDirectory()) { activeAlbums.push(albumPath); }
             }
+
+            console.log('activeAlbums', activeAlbums);
 
             if (activeAlbums.length === 0) {
 
@@ -96,6 +100,8 @@ const buildDirectories = (() => {
                 if (successCallback) { successCallback(); }
             }
 
+        } else {
+            if (successCallback) { successCallback(); }
         }
     };
 
@@ -117,6 +123,7 @@ const buildDirectories = (() => {
 
             copyFile(source, appJsonPath, copyCallback);
         } else {
+            console.log('no dummyJSON needed!', appJsonPath);
             if (successCallback) { successCallback(); }            
         }
     };
@@ -150,6 +157,7 @@ const buildDirectories = (() => {
 
             console.log('added working images: ' + appImagesPath);
         } else {
+            console.log('image path exists!', appImagesPath);
             if (successCallback) { successCallback(); }
         }
     };

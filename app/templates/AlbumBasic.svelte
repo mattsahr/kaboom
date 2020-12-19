@@ -1,12 +1,10 @@
 <script>
 	import Lightbox from './components/lightbox/Lightbox.svelte';
-	import ControlPanel from './components/control-panel/ControlPanel.svelte';
-	import Column from './components/columns/ColumnDragDrop.svelte';
+	import ColumnBasic from './components/columns/ColumnBasic.svelte';
 </script>
 
 <main>
-	<ControlPanel />
-	<Column />
+	<ColumnBasic />
 	<Lightbox />
 </main>
 

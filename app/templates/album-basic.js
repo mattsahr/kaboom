@@ -1,12 +1,7 @@
-import Album from './Album.svelte';
+import AlbumBasic from './AlbumBasic.svelte';
 import GalleryStore from './store/store';
 
-const hydrateSharedData = galleryData => {
-    window.NAV_DATA = window.NAV_DATA || {};
-    window.NAV_DATA.currentURL =galleryData.url;
-};
-
-const StartApp = galleryData => {
+const startApp = galleryData => {
 
     if (!galleryData) {
         console.error('GalleryData not found');
@@ -22,15 +17,14 @@ const StartApp = galleryData => {
         titleBar.innerHTML = title;
     }
 
-    GalleryStore.set(galleryData);
-    hydrateSharedData(galleryData);
-
     // eslint-disable-next-line no-unused-vars
-    const app = new Album({
+    const app = new AlbumBasic({
         target: document.getElementById('mainApp'),
         props: {}
     });
 
+    GalleryStore.set(galleryData);
+
 };
 
-window.StartApp = StartApp;
+window.StartApp = startApp;

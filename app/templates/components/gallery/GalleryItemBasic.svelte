@@ -1,27 +1,20 @@
 <script>
     import Intersector from './Intersector.svelte';
     import GalleryImage from './GalleryImage.svelte';
+    import GalleryDescriptionBasic from './GalleryDescriptionBasic.svelte';
 
     export let imgData;
-    export let mode;
     export let viewLightbox = () => false;
-    // console.log('imgData', imgData);
-
-    $: frameClass = 'photo-frame' + ' ' + mode;
 </script>
 
 <!-- ====================================== HTML =============================================== -->
 
 
-<div class={frameClass}>
+<div class="photo-frame">
     <Intersector once={true} let:intersecting={intersecting}>
         <GalleryImage {viewLightbox} {imgData} show={intersecting} />
     </Intersector>
-    <div class="description-block">
-        <div class="original">
-            {imgData.description || 'Yo dawg.'}
-        </div>
-    </div>
+    <GalleryDescriptionBasic {imgData} />
 </div>
 
 
@@ -39,34 +32,17 @@
         position: relative;
     }
 
-    .photo-frame.compact {
-        padding: 20px 10px 10px 10px;
-    }
-
-    .photo-frame.compact .description-block {
-        display: none;
-    }
-
-    .description-block {
-        padding: 0 20px 0 0;
-        font-size: 13px;
-        line-height: 1.7;
-        color: #505050;
-        text-align: left;
-        vertical-align: top;
-        width: 200px;
-        flex: 1 1 auto;
+    @media all and (max-width: 800px) {
+        .photo-frame {
+            padding: 24px 10px 18px 18px;
+        }
     }
 
     @media all and (max-width: 599px) {
         .photo-frame {
             flex-wrap: wrap;
             padding: 20px 10px 10px 10px;
-        }
-
-        .description-block {
-            padding: 10px;
-            width: 100%;
+            margin: 0;
         }
     }
 

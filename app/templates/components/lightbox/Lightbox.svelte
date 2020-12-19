@@ -49,7 +49,7 @@
             const zoomProps = {
                 minScale: 1,
                 maxScale: 5,
-                speed: 10,
+                speed: 6,
                 dragScrollableOptions: {
                     smoothExtinction: true
                 },
@@ -109,7 +109,7 @@
     $: workingHeight = calcHeight(data);
     $: workingWidth = calcWidth(data);
     $: photoClass = 'photo ' + (ratio > 1 ? 'tall' : ratio < 1 ? 'wide' : 'square');
-    $: alt = data.description ? data.height.slice(0, 10) : 'image';
+    $: alt = data.title || 'image';
     $: src = active ? getSizedPath('small', fileName) : '';
     $: srcset = !active 
         ? ''

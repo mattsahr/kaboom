@@ -18,38 +18,6 @@ const createGalleryStore = () => {
 
     const getAllImages = () => _cloneDeep(GALLERY.images);
 
-    const loadFullJSON = async () => {
-        var handleError = function (err) {
-            console.error('Fetch error', err);
-            return new window.Response(JSON.stringify({
-                code: 400,
-                message: 'FETCH ERROR'
-            }));
-        };
-
-        const req = await (fetch('album-meta-full.json').catch(handleError));
-
-        if (req.status === 200) {
-            const fullData = await req.json();
-
-            const updates = fullData.images
-                .filter(image => image.dataURI && image.dataURI !== 'noData');
-
-            const allImages = getAllImages();
-
-            for (const source of updates) {
-                const target = allImages.find(next => next.fileName === source.fileName);
-                if(target) {
-                    target.dataURI = source.dataURI;
-                }
-            }
-
-           updateImages(allImages);
-        } else {
-            console.log('album-meta-full.json NOT LOADED', req);
-        }
-
-    };
 
     const viewLightbox = fileName => {
         const updated = _cloneDeep(GALLERY);
@@ -61,19 +29,46 @@ const createGalleryStore = () => {
         set(updated);
     };
 
+    const updateDescription = (fileName, title, htmlString) => {
+        const updated = _cloneDeep(GALLERY);
+        const image = updated.images.find(next => next.fileName === fileName);
+
+        image.description = htmlString;
+        image.title = title || '';
+
+        set(updated);
+    };
+
     const closeLightbox = () => {
         const updated = _cloneDeep(GALLERY);
         updated.active = false;
         set(updated);
     };
 
+    const toggleControlPanel = () => {
+        const updated = _cloneDeep(GALLERY);
+        updated.controlPanelOpen = !updated.controlPanelOpen;
+        set(updated);
+    };
+
+    const updateMeta = updates => {
+        const updated = {
+            ...GALLERY,
+            ...updates
+        };
+        set(updated);
+    };
+
     return {
         updateImages,
         getAllImages,
-        loadFullJSON,
 
         viewLightbox,
         closeLightbox,
+        toggleControlPanel,
+
+        updateDescription,
+        updateMeta,
 
         subscribe,
         set,

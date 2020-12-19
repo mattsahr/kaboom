@@ -1,7 +1,7 @@
 <script>
     import { fade } from 'svelte/transition';
-    import { getSizedPath } from '../utility/helpers';
-    import { dummyImage } from '../utility/constants';
+    import { getSizedPath } from '../../utility/helpers';
+    import { dummyImage } from '../../utility/constants';
 
     export let viewLightbox = () => {};
     const showPic = () => {
@@ -19,7 +19,6 @@
         if (height > width) { return '100%'; }
         return (100 * height / width).toFixed(2) + '%';
     };
-
 
 
     export let imgData;
@@ -40,7 +39,7 @@
     $: src = show ? getSizedPath('small', fileName) : '';
     $: srcset = show ? srcSizes.map(getSrcSizes(fileName)).join(',') : '';
     $: spacerStyle = 'padding: 0 0 ' + getPadding(width, height) + ' 0';
-    $: alt = data.description ? data.height.slice(0, 10) : 'image';
+    $: alt = data.title ? data.title : 'image';
     $: svgSequence = data.svgSequence;
     $: svgHeight = data.svgHeight;
     $: svgWidth = data.svgWidth;
@@ -87,6 +86,7 @@
         flex: 100 1 auto;
         position: relative;
         cursor: pointer;
+        user-select: none;
     }
     .photo-spacer {
         width: 100%;
@@ -125,4 +125,5 @@
     .photo-inner-frame img.show {
         animation: photoCrossFade 1200ms;
     }
+
 </style>

@@ -31,11 +31,12 @@ const getIncludes = async (includes) => {
 
 const defaults = {
     replacements: {
-        __app_file_name__: 'default-app-bundle.js',
+        __app_file_name__: '__app/default-app-bundle.js',
         __API_file_name__: '',
-        __css_bundle_file_name__: 'default-bundle.css',
-        __css_global_file_name__: 'default-global.css',
-        __html_bundle_output__: 'default-index.html'        
+        __css_global_file_name__: '',
+        __css_bundle_file_name__: '__app/default-bundle.css',
+        __html_bundle_output__: 'default-index.html',
+        __css_nav_file_name__: '/default-nav.css'   
     },
     includes: []
 };

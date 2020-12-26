@@ -57,6 +57,29 @@ const createGalleryStore = () => {
             ...updates
         };
         set(updated);
+        console.log('STORE updateMeta', updated);
+    };
+
+    const hide = fileName => {
+        const updated = { ...GALLERY };
+        const toHide = GALLERY.images.find(image => image.fileName === fileName);
+        updated.images = GALLERY.images.filter(image => image.fileName !== fileName);
+
+        toHide.hidden = true;
+        updated.images.push(toHide);
+
+        set(updated);
+    };
+
+    const unhide = fileName => {
+        const updated = { ...GALLERY };
+        const toReveal = GALLERY.images.find(image => image.fileName === fileName);
+        updated.images = GALLERY.images.filter(image => image.fileName !== fileName);
+
+        toReveal.hidden = false;
+        updated.images.unshift(toReveal);
+
+        set(updated);
     };
 
     return {
@@ -69,6 +92,9 @@ const createGalleryStore = () => {
 
         updateDescription,
         updateMeta,
+
+        hide,
+        unhide,
 
         subscribe,
         set,

@@ -16,7 +16,7 @@
         "rollup-plugin-svelte": "^7.0.0",
         "rollup-plugin-terser": "^7.0.0",
         "svelte": "^3.0.0",
-        "svelte-dnd-action": "^0.6.22"
+        "svelte-dnd-action": "^0.6.30"
     },
     "dependencies": {
         "cl-editor": "^2.1.1",

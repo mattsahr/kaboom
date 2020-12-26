@@ -9,7 +9,7 @@ module.exports = {
         'kaboom_3_demo.jpg',
         'kaboom_4_demo.jpg'
     ],
-    DUMMY_RESOURCE_PATH: './build-scripts/dummy',
+    DUMMY_RESOURCE_PATH: './src/build-scripts/dummy',
     GALLERY_ACTIVE_PATH: './gallery-active',
     GALLERY_STATIC_PATH: './gallery-static',
     SITE_NAV_JSON: 'site-nav.json',

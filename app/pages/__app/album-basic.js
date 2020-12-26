@@ -3395,6 +3395,29 @@
                 ...updates
             };
             set(updated);
+            console.log('STORE updateMeta', updated);
+        };
+
+        const hide = fileName => {
+            const updated = { ...GALLERY };
+            const toHide = GALLERY.images.find(image => image.fileName === fileName);
+            updated.images = GALLERY.images.filter(image => image.fileName !== fileName);
+
+            toHide.hidden = true;
+            updated.images.push(toHide);
+
+            set(updated);
+        };
+
+        const unhide = fileName => {
+            const updated = { ...GALLERY };
+            const toReveal = GALLERY.images.find(image => image.fileName === fileName);
+            updated.images = GALLERY.images.filter(image => image.fileName !== fileName);
+
+            toReveal.hidden = false;
+            updated.images.unshift(toReveal);
+
+            set(updated);
         };
 
         return {
@@ -3407,6 +3430,9 @@
 
             updateDescription,
             updateMeta,
+
+            hide,
+            unhide,
 
             subscribe,
             set,
@@ -4482,18 +4508,24 @@
 
     function get_each_context(ctx, list, i) {
     	const child_ctx = ctx.slice();
-    	child_ctx[44] = list[i][0];
-    	child_ctx[45] = list[i][1];
-    	child_ctx[46] = list[i][2];
-    	child_ctx[47] = list[i][3];
-    	child_ctx[48] = list[i][4];
-    	child_ctx[49] = list[i][5];
+    	child_ctx[46] = list[i];
     	return child_ctx;
     }
 
-    // (213:0) {#if active}
+    function get_each_context_1(ctx, list, i) {
+    	const child_ctx = ctx.slice();
+    	child_ctx[49] = list[i][0];
+    	child_ctx[50] = list[i][1];
+    	child_ctx[51] = list[i][2];
+    	child_ctx[52] = list[i][3];
+    	child_ctx[53] = list[i][4];
+    	child_ctx[54] = list[i][5];
+    	return child_ctx;
+    }
+
+    // (222:0) {#if active}
     function create_if_block(ctx) {
-    	let div8;
+    	let div5;
     	let div0;
     	let iconmagnify;
     	let t0;
@@ -4510,13 +4542,11 @@
     	let iconchevronright;
     	let t4;
     	let t5;
-    	let div7;
-    	let div5;
-    	let t6;
-    	let div6;
-    	let div8_class_value;
-    	let div8_intro;
-    	let div8_outro;
+    	let each_blocks = [];
+    	let each_1_lookup = new Map();
+    	let div5_class_value;
+    	let div5_intro;
+    	let div5_outro;
     	let current;
     	let mounted;
     	let dispose;
@@ -4525,11 +4555,21 @@
     	iconx = new IconX({ $$inline: true });
     	iconchevronleft = new IconChevronLeft({ $$inline: true });
     	iconchevronright = new IconChevronRight({ $$inline: true });
-    	let if_block = /*arrived*/ ctx[3] && create_if_block_1(ctx);
+    	let if_block = /*arrived*/ ctx[6] && create_if_block_3(ctx);
+    	let each_value = [/*imgData*/ ctx[3]];
+    	validate_each_argument(each_value);
+    	const get_key = ctx => /*imgData*/ ctx[3];
+    	validate_each_keys(ctx, each_value, get_each_context, get_key);
+
+    	for (let i = 0; i < 1; i += 1) {
+    		let child_ctx = get_each_context(ctx, each_value, i);
+    		let key = get_key(child_ctx);
+    		each_1_lookup.set(key, each_blocks[i] = create_each_block(key, child_ctx));
+    	}
 
     	const block = {
     		c: function create() {
-    			div8 = element("div");
+    			div5 = element("div");
     			div0 = element("div");
     			create_component(iconmagnify.$$.fragment);
     			t0 = space();
@@ -4547,80 +4587,75 @@
     			t4 = space();
     			if (if_block) if_block.c();
     			t5 = space();
-    			div7 = element("div");
-    			div5 = element("div");
-    			t6 = space();
-    			div6 = element("div");
-    			div6.textContent = "Download";
-    			attr_dev(div0, "class", "icon-button magnify svelte-10pajrg");
-    			add_location(div0, file$5, 215, 4, 6880);
-    			attr_dev(div1, "class", "icon-button de-magnify svelte-10pajrg");
-    			add_location(div1, file$5, 216, 4, 6958);
-    			attr_dev(div2, "class", "icon-button close-me svelte-10pajrg");
-    			add_location(div2, file$5, 217, 4, 7042);
-    			attr_dev(div3, "class", "prior svelte-10pajrg");
-    			add_location(div3, file$5, 219, 4, 7118);
-    			attr_dev(div4, "class", "next svelte-10pajrg");
-    			add_location(div4, file$5, 220, 4, 7189);
-    			attr_dev(div5, "class", "description");
-    			add_location(div5, file$5, 249, 8, 8440);
-    			attr_dev(div6, "class", "download-button");
-    			add_location(div6, file$5, 250, 8, 8481);
-    			attr_dev(div7, "class", "description-panel svelte-10pajrg");
-    			add_location(div7, file$5, 248, 4, 8399);
-    			attr_dev(div8, "class", div8_class_value = "" + (null_to_empty(/*lightboxClass*/ ctx[10]) + " svelte-10pajrg"));
-    			add_location(div8, file$5, 213, 0, 6828);
+
+    			for (let i = 0; i < 1; i += 1) {
+    				each_blocks[i].c();
+    			}
+
+    			attr_dev(div0, "class", "icon-button magnify svelte-15bjp02");
+    			add_location(div0, file$5, 224, 4, 7162);
+    			attr_dev(div1, "class", "icon-button de-magnify svelte-15bjp02");
+    			add_location(div1, file$5, 225, 4, 7240);
+    			attr_dev(div2, "class", "icon-button close-me svelte-15bjp02");
+    			add_location(div2, file$5, 226, 4, 7324);
+    			attr_dev(div3, "class", "prior svelte-15bjp02");
+    			add_location(div3, file$5, 228, 4, 7400);
+    			attr_dev(div4, "class", "next svelte-15bjp02");
+    			add_location(div4, file$5, 229, 4, 7471);
+    			attr_dev(div5, "class", div5_class_value = "" + (null_to_empty(/*lightboxClass*/ ctx[13]) + " svelte-15bjp02"));
+    			add_location(div5, file$5, 222, 0, 7110);
     		},
     		m: function mount(target, anchor) {
-    			insert_dev(target, div8, anchor);
-    			append_dev(div8, div0);
+    			insert_dev(target, div5, anchor);
+    			append_dev(div5, div0);
     			mount_component(iconmagnify, div0, null);
-    			append_dev(div8, t0);
-    			append_dev(div8, div1);
+    			append_dev(div5, t0);
+    			append_dev(div5, div1);
     			mount_component(icondemagnify, div1, null);
-    			append_dev(div8, t1);
-    			append_dev(div8, div2);
+    			append_dev(div5, t1);
+    			append_dev(div5, div2);
     			mount_component(iconx, div2, null);
-    			append_dev(div8, t2);
-    			append_dev(div8, div3);
+    			append_dev(div5, t2);
+    			append_dev(div5, div3);
     			mount_component(iconchevronleft, div3, null);
-    			append_dev(div8, t3);
-    			append_dev(div8, div4);
+    			append_dev(div5, t3);
+    			append_dev(div5, div4);
     			mount_component(iconchevronright, div4, null);
-    			append_dev(div8, t4);
-    			if (if_block) if_block.m(div8, null);
-    			append_dev(div8, t5);
-    			append_dev(div8, div7);
-    			append_dev(div7, div5);
-    			append_dev(div7, t6);
-    			append_dev(div7, div6);
+    			append_dev(div5, t4);
+    			if (if_block) if_block.m(div5, null);
+    			append_dev(div5, t5);
+
+    			for (let i = 0; i < 1; i += 1) {
+    				each_blocks[i].m(div5, null);
+    			}
+
     			current = true;
 
     			if (!mounted) {
     				dispose = [
-    					listen_dev(div0, "click", /*zoomIn*/ ctx[17], false, false, false),
-    					listen_dev(div1, "click", /*zoomOut*/ ctx[18], false, false, false),
-    					listen_dev(div2, "click", /*closeMe*/ ctx[13], false, false, false),
-    					listen_dev(div3, "click", /*showPrior*/ ctx[22], false, false, false),
-    					listen_dev(div4, "click", /*showNext*/ ctx[21], false, false, false)
+    					listen_dev(div0, "click", /*zoomIn*/ ctx[20], false, false, false),
+    					listen_dev(div1, "click", /*zoomOut*/ ctx[21], false, false, false),
+    					listen_dev(div2, "click", /*closeMe*/ ctx[16], false, false, false),
+    					listen_dev(div3, "click", /*showPrior*/ ctx[25], false, false, false),
+    					listen_dev(div4, "click", /*showNext*/ ctx[24], false, false, false)
     				];
 
     				mounted = true;
     			}
     		},
     		p: function update(ctx, dirty) {
-    			if (/*arrived*/ ctx[3]) {
+    			if (/*arrived*/ ctx[6]) {
     				if (if_block) {
     					if_block.p(ctx, dirty);
 
-    					if (dirty[0] & /*arrived*/ 8) {
+    					if (dirty[0] & /*arrived*/ 64) {
     						transition_in(if_block, 1);
     					}
     				} else {
-    					if_block = create_if_block_1(ctx);
+    					if_block = create_if_block_3(ctx);
     					if_block.c();
     					transition_in(if_block, 1);
-    					if_block.m(div8, t5);
+    					if_block.m(div5, t5);
     				}
     			} else if (if_block) {
     				group_outros();
@@ -4632,8 +4667,17 @@
     				check_outros();
     			}
 
-    			if (!current || dirty[0] & /*lightboxClass*/ 1024 && div8_class_value !== (div8_class_value = "" + (null_to_empty(/*lightboxClass*/ ctx[10]) + " svelte-10pajrg"))) {
-    				attr_dev(div8, "class", div8_class_value);
+    			if (dirty[0] & /*showFullDescription, imgData, $GalleryStore, toggleDescription*/ 67108892) {
+    				const each_value = [/*imgData*/ ctx[3]];
+    				validate_each_argument(each_value);
+    				group_outros();
+    				validate_each_keys(ctx, each_value, get_each_context, get_key);
+    				each_blocks = update_keyed_each(each_blocks, dirty, get_key, 1, ctx, each_value, each_1_lookup, div5, outro_and_destroy_block, create_each_block, null, get_each_context);
+    				check_outros();
+    			}
+
+    			if (!current || dirty[0] & /*lightboxClass*/ 8192 && div5_class_value !== (div5_class_value = "" + (null_to_empty(/*lightboxClass*/ ctx[13]) + " svelte-15bjp02"))) {
+    				attr_dev(div5, "class", div5_class_value);
     			}
     		},
     		i: function intro(local) {
@@ -4645,10 +4689,14 @@
     			transition_in(iconchevronright.$$.fragment, local);
     			transition_in(if_block);
 
+    			for (let i = 0; i < 1; i += 1) {
+    				transition_in(each_blocks[i]);
+    			}
+
     			add_render_callback(() => {
-    				if (div8_outro) div8_outro.end(1);
-    				if (!div8_intro) div8_intro = create_in_transition(div8, fade, {});
-    				div8_intro.start();
+    				if (div5_outro) div5_outro.end(1);
+    				if (!div5_intro) div5_intro = create_in_transition(div5, fade, {});
+    				div5_intro.start();
     			});
 
     			current = true;
@@ -4660,19 +4708,29 @@
     			transition_out(iconchevronleft.$$.fragment, local);
     			transition_out(iconchevronright.$$.fragment, local);
     			transition_out(if_block);
-    			if (div8_intro) div8_intro.invalidate();
-    			div8_outro = create_out_transition(div8, fade, {});
+
+    			for (let i = 0; i < 1; i += 1) {
+    				transition_out(each_blocks[i]);
+    			}
+
+    			if (div5_intro) div5_intro.invalidate();
+    			div5_outro = create_out_transition(div5, fade, {});
     			current = false;
     		},
     		d: function destroy(detaching) {
-    			if (detaching) detach_dev(div8);
+    			if (detaching) detach_dev(div5);
     			destroy_component(iconmagnify);
     			destroy_component(icondemagnify);
     			destroy_component(iconx);
     			destroy_component(iconchevronleft);
     			destroy_component(iconchevronright);
     			if (if_block) if_block.d();
-    			if (detaching && div8_outro) div8_outro.end();
+
+    			for (let i = 0; i < 1; i += 1) {
+    				each_blocks[i].d();
+    			}
+
+    			if (detaching && div5_outro) div5_outro.end();
     			mounted = false;
     			run_all(dispose);
     		}
@@ -4682,15 +4740,15 @@
     		block,
     		id: create_if_block.name,
     		type: "if",
-    		source: "(213:0) {#if active}",
+    		source: "(222:0) {#if active}",
     		ctx
     	});
 
     	return block;
     }
 
-    // (223:4) {#if arrived}
-    function create_if_block_1(ctx) {
+    // (232:4) {#if arrived}
+    function create_if_block_3(ctx) {
     	let div1;
     	let div0;
     	let t;
@@ -4701,7 +4759,7 @@
     	let current;
     	let mounted;
     	let dispose;
-    	let if_block = !/*loaded*/ ctx[0] && create_if_block_2(ctx);
+    	let if_block = !/*loaded*/ ctx[0] && create_if_block_4(ctx);
 
     	const block = {
     		c: function create() {
@@ -4710,16 +4768,16 @@
     			if (if_block) if_block.c();
     			t = space();
     			img = element("img");
-    			if (img.src !== (img_src_value = /*src*/ ctx[5])) attr_dev(img, "src", img_src_value);
-    			attr_dev(img, "srcset", /*srcset*/ ctx[6]);
-    			attr_dev(img, "alt", /*alt*/ ctx[4]);
-    			attr_dev(img, "class", "svelte-10pajrg");
-    			add_location(img, file$5, 243, 12, 8260);
-    			attr_dev(div0, "class", "photo svelte-10pajrg");
-    			attr_dev(div0, "style", /*photoScale*/ ctx[12]);
-    			add_location(div0, file$5, 224, 8, 7339);
-    			attr_dev(div1, "class", "photo-frame svelte-10pajrg");
-    			add_location(div1, file$5, 223, 4, 7280);
+    			if (img.src !== (img_src_value = /*src*/ ctx[8])) attr_dev(img, "src", img_src_value);
+    			attr_dev(img, "srcset", /*srcset*/ ctx[9]);
+    			attr_dev(img, "alt", /*alt*/ ctx[7]);
+    			attr_dev(img, "class", "svelte-15bjp02");
+    			add_location(img, file$5, 252, 12, 8542);
+    			attr_dev(div0, "class", "photo svelte-15bjp02");
+    			attr_dev(div0, "style", /*photoScale*/ ctx[15]);
+    			add_location(div0, file$5, 233, 8, 7621);
+    			attr_dev(div1, "class", "photo-frame svelte-15bjp02");
+    			add_location(div1, file$5, 232, 4, 7562);
     		},
     		m: function mount(target, anchor) {
     			insert_dev(target, div1, anchor);
@@ -4727,11 +4785,11 @@
     			if (if_block) if_block.m(div0, null);
     			append_dev(div0, t);
     			append_dev(div0, img);
-    			/*img_binding*/ ctx[33](img);
+    			/*img_binding*/ ctx[35](img);
     			current = true;
 
     			if (!mounted) {
-    				dispose = listen_dev(img, "load", /*onImageLoad*/ ctx[14], false, false, false);
+    				dispose = listen_dev(img, "load", /*onImageLoad*/ ctx[17], false, false, false);
     				mounted = true;
     			}
     		},
@@ -4744,7 +4802,7 @@
     						transition_in(if_block, 1);
     					}
     				} else {
-    					if_block = create_if_block_2(ctx);
+    					if_block = create_if_block_4(ctx);
     					if_block.c();
     					transition_in(if_block, 1);
     					if_block.m(div0, t);
@@ -4759,20 +4817,20 @@
     				check_outros();
     			}
 
-    			if (!current || dirty[0] & /*src*/ 32 && img.src !== (img_src_value = /*src*/ ctx[5])) {
+    			if (!current || dirty[0] & /*src*/ 256 && img.src !== (img_src_value = /*src*/ ctx[8])) {
     				attr_dev(img, "src", img_src_value);
     			}
 
-    			if (!current || dirty[0] & /*srcset*/ 64) {
-    				attr_dev(img, "srcset", /*srcset*/ ctx[6]);
+    			if (!current || dirty[0] & /*srcset*/ 512) {
+    				attr_dev(img, "srcset", /*srcset*/ ctx[9]);
     			}
 
-    			if (!current || dirty[0] & /*alt*/ 16) {
-    				attr_dev(img, "alt", /*alt*/ ctx[4]);
+    			if (!current || dirty[0] & /*alt*/ 128) {
+    				attr_dev(img, "alt", /*alt*/ ctx[7]);
     			}
 
-    			if (!current || dirty[0] & /*photoScale*/ 4096) {
-    				attr_dev(div0, "style", /*photoScale*/ ctx[12]);
+    			if (!current || dirty[0] & /*photoScale*/ 32768) {
+    				attr_dev(div0, "style", /*photoScale*/ ctx[15]);
     			}
     		},
     		i: function intro(local) {
@@ -4781,7 +4839,7 @@
 
     			add_render_callback(() => {
     				if (div1_outro) div1_outro.end(1);
-    				if (!div1_intro) div1_intro = create_in_transition(div1, /*slideIn*/ ctx[20], {});
+    				if (!div1_intro) div1_intro = create_in_transition(div1, /*slideIn*/ ctx[23], {});
     				div1_intro.start();
     			});
 
@@ -4790,13 +4848,13 @@
     		o: function outro(local) {
     			transition_out(if_block);
     			if (div1_intro) div1_intro.invalidate();
-    			div1_outro = create_out_transition(div1, /*slideOut*/ ctx[19], {});
+    			div1_outro = create_out_transition(div1, /*slideOut*/ ctx[22], {});
     			current = false;
     		},
     		d: function destroy(detaching) {
     			if (detaching) detach_dev(div1);
     			if (if_block) if_block.d();
-    			/*img_binding*/ ctx[33](null);
+    			/*img_binding*/ ctx[35](null);
     			if (detaching && div1_outro) div1_outro.end();
     			mounted = false;
     			dispose();
@@ -4805,17 +4863,17 @@
 
     	dispatch_dev("SvelteRegisterBlock", {
     		block,
-    		id: create_if_block_1.name,
+    		id: create_if_block_3.name,
     		type: "if",
-    		source: "(223:4) {#if arrived}",
+    		source: "(232:4) {#if arrived}",
     		ctx
     	});
 
     	return block;
     }
 
-    // (227:12) {#if !loaded}
-    function create_if_block_2(ctx) {
+    // (236:12) {#if !loaded}
+    function create_if_block_4(ctx) {
     	let div;
     	let svg;
     	let g;
@@ -4823,13 +4881,13 @@
     	let div_class_value;
     	let div_outro;
     	let current;
-    	let if_block = !/*loaded*/ ctx[0] && create_if_block_3(ctx);
-    	let each_value = /*svgSequence*/ ctx[7];
-    	validate_each_argument(each_value);
+    	let if_block = !/*loaded*/ ctx[0] && create_if_block_5(ctx);
+    	let each_value_1 = /*svgSequence*/ ctx[10];
+    	validate_each_argument(each_value_1);
     	let each_blocks = [];
 
-    	for (let i = 0; i < each_value.length; i += 1) {
-    		each_blocks[i] = create_each_block(get_each_context(ctx, each_value, i));
+    	for (let i = 0; i < each_value_1.length; i += 1) {
+    		each_blocks[i] = create_each_block_1(get_each_context_1(ctx, each_value_1, i));
     	}
 
     	const block = {
@@ -4843,16 +4901,16 @@
     				each_blocks[i].c();
     			}
 
-    			add_location(g, file$5, 234, 24, 7898);
+    			add_location(g, file$5, 243, 24, 8180);
     			attr_dev(svg, "xmlns", "http://www.w3.org/2000/svg");
     			attr_dev(svg, "version", "1.1");
     			attr_dev(svg, "width", "100%");
     			attr_dev(svg, "height", "100%");
-    			attr_dev(svg, "viewBox", svg_viewBox_value = "0 0 " + /*svgWidth*/ ctx[9] + " " + /*svgHeight*/ ctx[8]);
-    			attr_dev(svg, "class", "svelte-10pajrg");
-    			add_location(svg, file$5, 228, 20, 7494);
-    			attr_dev(div, "class", div_class_value = "" + (null_to_empty(/*photoSvgClass*/ ctx[11]) + " svelte-10pajrg"));
-    			add_location(div, file$5, 227, 16, 7424);
+    			attr_dev(svg, "viewBox", svg_viewBox_value = "0 0 " + /*svgWidth*/ ctx[12] + " " + /*svgHeight*/ ctx[11]);
+    			attr_dev(svg, "class", "svelte-15bjp02");
+    			add_location(svg, file$5, 237, 20, 7776);
+    			attr_dev(div, "class", div_class_value = "" + (null_to_empty(/*photoSvgClass*/ ctx[14]) + " svelte-15bjp02"));
+    			add_location(div, file$5, 236, 16, 7706);
     		},
     		m: function mount(target, anchor) {
     			insert_dev(target, div, anchor);
@@ -4877,7 +4935,7 @@
     						transition_in(if_block, 1);
     					}
     				} else {
-    					if_block = create_if_block_3(ctx);
+    					if_block = create_if_block_5(ctx);
     					if_block.c();
     					transition_in(if_block, 1);
     					if_block.m(svg, g);
@@ -4892,18 +4950,18 @@
     				check_outros();
     			}
 
-    			if (dirty[0] & /*svgSequence*/ 128) {
-    				each_value = /*svgSequence*/ ctx[7];
-    				validate_each_argument(each_value);
+    			if (dirty[0] & /*svgSequence*/ 1024) {
+    				each_value_1 = /*svgSequence*/ ctx[10];
+    				validate_each_argument(each_value_1);
     				let i;
 
-    				for (i = 0; i < each_value.length; i += 1) {
-    					const child_ctx = get_each_context(ctx, each_value, i);
+    				for (i = 0; i < each_value_1.length; i += 1) {
+    					const child_ctx = get_each_context_1(ctx, each_value_1, i);
 
     					if (each_blocks[i]) {
     						each_blocks[i].p(child_ctx, dirty);
     					} else {
-    						each_blocks[i] = create_each_block(child_ctx);
+    						each_blocks[i] = create_each_block_1(child_ctx);
     						each_blocks[i].c();
     						each_blocks[i].m(g, null);
     					}
@@ -4913,14 +4971,14 @@
     					each_blocks[i].d(1);
     				}
 
-    				each_blocks.length = each_value.length;
+    				each_blocks.length = each_value_1.length;
     			}
 
-    			if (!current || dirty[0] & /*svgWidth, svgHeight*/ 768 && svg_viewBox_value !== (svg_viewBox_value = "0 0 " + /*svgWidth*/ ctx[9] + " " + /*svgHeight*/ ctx[8])) {
+    			if (!current || dirty[0] & /*svgWidth, svgHeight*/ 6144 && svg_viewBox_value !== (svg_viewBox_value = "0 0 " + /*svgWidth*/ ctx[12] + " " + /*svgHeight*/ ctx[11])) {
     				attr_dev(svg, "viewBox", svg_viewBox_value);
     			}
 
-    			if (!current || dirty[0] & /*photoSvgClass*/ 2048 && div_class_value !== (div_class_value = "" + (null_to_empty(/*photoSvgClass*/ ctx[11]) + " svelte-10pajrg"))) {
+    			if (!current || dirty[0] & /*photoSvgClass*/ 16384 && div_class_value !== (div_class_value = "" + (null_to_empty(/*photoSvgClass*/ ctx[14]) + " svelte-15bjp02"))) {
     				attr_dev(div, "class", div_class_value);
     			}
     		},
@@ -4932,7 +4990,7 @@
     		},
     		o: function outro(local) {
     			transition_out(if_block);
-    			div_outro = create_out_transition(div, fade, /*fadeSlow*/ ctx[15]);
+    			div_outro = create_out_transition(div, fade, /*fadeSlow*/ ctx[18]);
     			current = false;
     		},
     		d: function destroy(detaching) {
@@ -4945,17 +5003,17 @@
 
     	dispatch_dev("SvelteRegisterBlock", {
     		block,
-    		id: create_if_block_2.name,
+    		id: create_if_block_4.name,
     		type: "if",
-    		source: "(227:12) {#if !loaded}",
+    		source: "(236:12) {#if !loaded}",
     		ctx
     	});
 
     	return block;
     }
 
-    // (231:24) {#if !loaded}
-    function create_if_block_3(ctx) {
+    // (240:24) {#if !loaded}
+    function create_if_block_5(ctx) {
     	let rect;
     	let rect_outro;
     	let current;
@@ -4965,10 +5023,10 @@
     			rect = svg_element("rect");
     			attr_dev(rect, "x", "0");
     			attr_dev(rect, "y", "0");
-    			attr_dev(rect, "width", /*svgWidth*/ ctx[9]);
-    			attr_dev(rect, "height", /*svgHeight*/ ctx[8]);
+    			attr_dev(rect, "width", /*svgWidth*/ ctx[12]);
+    			attr_dev(rect, "height", /*svgHeight*/ ctx[11]);
     			attr_dev(rect, "fill", "#f0f0f0");
-    			add_location(rect, file$5, 231, 28, 7716);
+    			add_location(rect, file$5, 240, 28, 7998);
     		},
     		m: function mount(target, anchor) {
     			insert_dev(target, rect, anchor);
@@ -4977,12 +5035,12 @@
     		p: function update(new_ctx, dirty) {
     			ctx = new_ctx;
 
-    			if (!current || dirty[0] & /*svgWidth*/ 512) {
-    				attr_dev(rect, "width", /*svgWidth*/ ctx[9]);
+    			if (!current || dirty[0] & /*svgWidth*/ 4096) {
+    				attr_dev(rect, "width", /*svgWidth*/ ctx[12]);
     			}
 
-    			if (!current || dirty[0] & /*svgHeight*/ 256) {
-    				attr_dev(rect, "height", /*svgHeight*/ ctx[8]);
+    			if (!current || dirty[0] & /*svgHeight*/ 2048) {
+    				attr_dev(rect, "height", /*svgHeight*/ ctx[11]);
     			}
     		},
     		i: function intro(local) {
@@ -4991,7 +5049,7 @@
     			current = true;
     		},
     		o: function outro(local) {
-    			rect_outro = create_out_transition(rect, fade, /*fadeQuick*/ ctx[16]);
+    			rect_outro = create_out_transition(rect, fade, /*fadeQuick*/ ctx[19]);
     			current = false;
     		},
     		d: function destroy(detaching) {
@@ -5002,17 +5060,17 @@
 
     	dispatch_dev("SvelteRegisterBlock", {
     		block,
-    		id: create_if_block_3.name,
+    		id: create_if_block_5.name,
     		type: "if",
-    		source: "(231:24) {#if !loaded}",
+    		source: "(240:24) {#if !loaded}",
     		ctx
     	});
 
     	return block;
     }
 
-    // (236:28) {#each svgSequence as [ fill, opacity, cx, cy, rx, ry ] }
-    function create_each_block(ctx) {
+    // (245:28) {#each svgSequence as [ fill, opacity, cx, cy, rx, ry ] }
+    function create_each_block_1(ctx) {
     	let ellipse;
     	let ellipse_fill_value;
     	let ellipse_fill_opacity_value;
@@ -5024,39 +5082,39 @@
     	const block = {
     		c: function create() {
     			ellipse = svg_element("ellipse");
-    			attr_dev(ellipse, "fill", ellipse_fill_value = /*fill*/ ctx[44]);
-    			attr_dev(ellipse, "fill-opacity", ellipse_fill_opacity_value = /*opacity*/ ctx[45]);
-    			attr_dev(ellipse, "cx", ellipse_cx_value = /*cx*/ ctx[46]);
-    			attr_dev(ellipse, "cy", ellipse_cy_value = /*cy*/ ctx[47]);
-    			attr_dev(ellipse, "rx", ellipse_rx_value = /*rx*/ ctx[48]);
-    			attr_dev(ellipse, "ry", ellipse_ry_value = /*ry*/ ctx[49]);
-    			add_location(ellipse, file$5, 236, 32, 8022);
+    			attr_dev(ellipse, "fill", ellipse_fill_value = /*fill*/ ctx[49]);
+    			attr_dev(ellipse, "fill-opacity", ellipse_fill_opacity_value = /*opacity*/ ctx[50]);
+    			attr_dev(ellipse, "cx", ellipse_cx_value = /*cx*/ ctx[51]);
+    			attr_dev(ellipse, "cy", ellipse_cy_value = /*cy*/ ctx[52]);
+    			attr_dev(ellipse, "rx", ellipse_rx_value = /*rx*/ ctx[53]);
+    			attr_dev(ellipse, "ry", ellipse_ry_value = /*ry*/ ctx[54]);
+    			add_location(ellipse, file$5, 245, 32, 8304);
     		},
     		m: function mount(target, anchor) {
     			insert_dev(target, ellipse, anchor);
     		},
     		p: function update(ctx, dirty) {
-    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_fill_value !== (ellipse_fill_value = /*fill*/ ctx[44])) {
+    			if (dirty[0] & /*svgSequence*/ 1024 && ellipse_fill_value !== (ellipse_fill_value = /*fill*/ ctx[49])) {
     				attr_dev(ellipse, "fill", ellipse_fill_value);
     			}
 
-    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_fill_opacity_value !== (ellipse_fill_opacity_value = /*opacity*/ ctx[45])) {
+    			if (dirty[0] & /*svgSequence*/ 1024 && ellipse_fill_opacity_value !== (ellipse_fill_opacity_value = /*opacity*/ ctx[50])) {
     				attr_dev(ellipse, "fill-opacity", ellipse_fill_opacity_value);
     			}
 
-    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_cx_value !== (ellipse_cx_value = /*cx*/ ctx[46])) {
+    			if (dirty[0] & /*svgSequence*/ 1024 && ellipse_cx_value !== (ellipse_cx_value = /*cx*/ ctx[51])) {
     				attr_dev(ellipse, "cx", ellipse_cx_value);
     			}
 
-    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_cy_value !== (ellipse_cy_value = /*cy*/ ctx[47])) {
+    			if (dirty[0] & /*svgSequence*/ 1024 && ellipse_cy_value !== (ellipse_cy_value = /*cy*/ ctx[52])) {
     				attr_dev(ellipse, "cy", ellipse_cy_value);
     			}
 
-    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_rx_value !== (ellipse_rx_value = /*rx*/ ctx[48])) {
+    			if (dirty[0] & /*svgSequence*/ 1024 && ellipse_rx_value !== (ellipse_rx_value = /*rx*/ ctx[53])) {
     				attr_dev(ellipse, "rx", ellipse_rx_value);
     			}
 
-    			if (dirty[0] & /*svgSequence*/ 128 && ellipse_ry_value !== (ellipse_ry_value = /*ry*/ ctx[49])) {
+    			if (dirty[0] & /*svgSequence*/ 1024 && ellipse_ry_value !== (ellipse_ry_value = /*ry*/ ctx[54])) {
     				attr_dev(ellipse, "ry", ellipse_ry_value);
     			}
     		},
@@ -5067,9 +5125,313 @@
 
     	dispatch_dev("SvelteRegisterBlock", {
     		block,
+    		id: create_each_block_1.name,
+    		type: "each",
+    		source: "(245:28) {#each svgSequence as [ fill, opacity, cx, cy, rx, ry ] }",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (265:20) {:else}
+    function create_else_block(ctx) {
+    	let iconchevronleft;
+    	let current;
+    	iconchevronleft = new IconChevronLeft({ $$inline: true });
+
+    	const block = {
+    		c: function create() {
+    			create_component(iconchevronleft.$$.fragment);
+    		},
+    		m: function mount(target, anchor) {
+    			mount_component(iconchevronleft, target, anchor);
+    			current = true;
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(iconchevronleft.$$.fragment, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(iconchevronleft.$$.fragment, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			destroy_component(iconchevronleft, detaching);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_else_block.name,
+    		type: "else",
+    		source: "(265:20) {:else}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (263:20) {#if showFullDescription}
+    function create_if_block_2(ctx) {
+    	let iconchevronright;
+    	let current;
+    	iconchevronright = new IconChevronRight({ $$inline: true });
+
+    	const block = {
+    		c: function create() {
+    			create_component(iconchevronright.$$.fragment);
+    		},
+    		m: function mount(target, anchor) {
+    			mount_component(iconchevronright, target, anchor);
+    			current = true;
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(iconchevronright.$$.fragment, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(iconchevronright.$$.fragment, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			destroy_component(iconchevronright, detaching);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_if_block_2.name,
+    		type: "if",
+    		source: "(263:20) {#if showFullDescription}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (272:16) {#if $GalleryStore.allowDownloads}
+    function create_if_block_1(ctx) {
+    	let a;
+    	let t;
+    	let iconchevronright;
+    	let a_href_value;
+    	let a_download_value;
+    	let current;
+    	iconchevronright = new IconChevronRight({ $$inline: true });
+
+    	const block = {
+    		c: function create() {
+    			a = element("a");
+    			t = text("Download\r\n                            ");
+    			create_component(iconchevronright.$$.fragment);
+    			attr_dev(a, "class", "download-button svelte-15bjp02");
+    			attr_dev(a, "href", a_href_value = "__original/" + /*imgData*/ ctx[3].fileName);
+    			attr_dev(a, "download", a_download_value = /*imgData*/ ctx[3].fileName);
+    			add_location(a, file$5, 272, 20, 9328);
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, a, anchor);
+    			append_dev(a, t);
+    			mount_component(iconchevronright, a, null);
+    			current = true;
+    		},
+    		p: function update(ctx, dirty) {
+    			if (!current || dirty[0] & /*imgData*/ 8 && a_href_value !== (a_href_value = "__original/" + /*imgData*/ ctx[3].fileName)) {
+    				attr_dev(a, "href", a_href_value);
+    			}
+
+    			if (!current || dirty[0] & /*imgData*/ 8 && a_download_value !== (a_download_value = /*imgData*/ ctx[3].fileName)) {
+    				attr_dev(a, "download", a_download_value);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(iconchevronright.$$.fragment, local);
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(iconchevronright.$$.fragment, local);
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(a);
+    			destroy_component(iconchevronright);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_if_block_1.name,
+    		type: "if",
+    		source: "(272:16) {#if $GalleryStore.allowDownloads}",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    // (258:4) {#each [imgData] as count (imgData) }
+    function create_each_block(key_1, ctx) {
+    	let div3;
+    	let div2;
+    	let div0;
+    	let current_block_type_index;
+    	let if_block0;
+    	let t0;
+    	let div1;
+    	let raw_value = /*imgData*/ ctx[3].description + "";
+    	let t1;
+    	let t2;
+    	let div3_class_value;
+    	let div3_intro;
+    	let div3_outro;
+    	let current;
+    	let mounted;
+    	let dispose;
+    	const if_block_creators = [create_if_block_2, create_else_block];
+    	const if_blocks = [];
+
+    	function select_block_type(ctx, dirty) {
+    		if (/*showFullDescription*/ ctx[4]) return 0;
+    		return 1;
+    	}
+
+    	current_block_type_index = select_block_type(ctx);
+    	if_block0 = if_blocks[current_block_type_index] = if_block_creators[current_block_type_index](ctx);
+    	let if_block1 = /*$GalleryStore*/ ctx[2].allowDownloads && create_if_block_1(ctx);
+
+    	const block = {
+    		key: key_1,
+    		first: null,
+    		c: function create() {
+    			div3 = element("div");
+    			div2 = element("div");
+    			div0 = element("div");
+    			if_block0.c();
+    			t0 = space();
+    			div1 = element("div");
+    			t1 = space();
+    			if (if_block1) if_block1.c();
+    			t2 = space();
+    			attr_dev(div0, "class", "description-expand-toggle svelte-15bjp02");
+    			add_location(div0, file$5, 261, 16, 8888);
+    			attr_dev(div1, "class", "description svelte-15bjp02");
+    			add_location(div1, file$5, 269, 16, 9194);
+    			attr_dev(div2, "class", "description-column svelte-15bjp02");
+    			add_location(div2, file$5, 259, 12, 8836);
+    			attr_dev(div3, "class", div3_class_value = "" + (null_to_empty("description-panel" + (/*showFullDescription*/ ctx[4] ? "" : " collapsed")) + " svelte-15bjp02"));
+    			add_location(div3, file$5, 258, 8, 8728);
+    			this.first = div3;
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, div3, anchor);
+    			append_dev(div3, div2);
+    			append_dev(div2, div0);
+    			if_blocks[current_block_type_index].m(div0, null);
+    			append_dev(div2, t0);
+    			append_dev(div2, div1);
+    			div1.innerHTML = raw_value;
+    			append_dev(div2, t1);
+    			if (if_block1) if_block1.m(div2, null);
+    			append_dev(div3, t2);
+    			current = true;
+
+    			if (!mounted) {
+    				dispose = listen_dev(div0, "click", /*toggleDescription*/ ctx[26], false, false, false);
+    				mounted = true;
+    			}
+    		},
+    		p: function update(ctx, dirty) {
+    			let previous_block_index = current_block_type_index;
+    			current_block_type_index = select_block_type(ctx);
+
+    			if (current_block_type_index !== previous_block_index) {
+    				group_outros();
+
+    				transition_out(if_blocks[previous_block_index], 1, 1, () => {
+    					if_blocks[previous_block_index] = null;
+    				});
+
+    				check_outros();
+    				if_block0 = if_blocks[current_block_type_index];
+
+    				if (!if_block0) {
+    					if_block0 = if_blocks[current_block_type_index] = if_block_creators[current_block_type_index](ctx);
+    					if_block0.c();
+    				} else {
+    					if_block0.p(ctx, dirty);
+    				}
+
+    				transition_in(if_block0, 1);
+    				if_block0.m(div0, null);
+    			}
+
+    			if ((!current || dirty[0] & /*imgData*/ 8) && raw_value !== (raw_value = /*imgData*/ ctx[3].description + "")) div1.innerHTML = raw_value;
+    			if (/*$GalleryStore*/ ctx[2].allowDownloads) {
+    				if (if_block1) {
+    					if_block1.p(ctx, dirty);
+
+    					if (dirty[0] & /*$GalleryStore*/ 4) {
+    						transition_in(if_block1, 1);
+    					}
+    				} else {
+    					if_block1 = create_if_block_1(ctx);
+    					if_block1.c();
+    					transition_in(if_block1, 1);
+    					if_block1.m(div2, null);
+    				}
+    			} else if (if_block1) {
+    				group_outros();
+
+    				transition_out(if_block1, 1, 1, () => {
+    					if_block1 = null;
+    				});
+
+    				check_outros();
+    			}
+
+    			if (!current || dirty[0] & /*showFullDescription*/ 16 && div3_class_value !== (div3_class_value = "" + (null_to_empty("description-panel" + (/*showFullDescription*/ ctx[4] ? "" : " collapsed")) + " svelte-15bjp02"))) {
+    				attr_dev(div3, "class", div3_class_value);
+    			}
+    		},
+    		i: function intro(local) {
+    			if (current) return;
+    			transition_in(if_block0);
+    			transition_in(if_block1);
+
+    			add_render_callback(() => {
+    				if (div3_outro) div3_outro.end(1);
+    				if (!div3_intro) div3_intro = create_in_transition(div3, fade, {});
+    				div3_intro.start();
+    			});
+
+    			current = true;
+    		},
+    		o: function outro(local) {
+    			transition_out(if_block0);
+    			transition_out(if_block1);
+    			if (div3_intro) div3_intro.invalidate();
+    			div3_outro = create_out_transition(div3, fade, {});
+    			current = false;
+    		},
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(div3);
+    			if_blocks[current_block_type_index].d();
+    			if (if_block1) if_block1.d();
+    			if (detaching && div3_outro) div3_outro.end();
+    			mounted = false;
+    			dispose();
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
     		id: create_each_block.name,
     		type: "each",
-    		source: "(236:28) {#each svgSequence as [ fill, opacity, cx, cy, rx, ry ] }",
+    		source: "(258:4) {#each [imgData] as count (imgData) }",
     		ctx
     	});
 
@@ -5147,10 +5509,11 @@
     function instance$5($$self, $$props, $$invalidate) {
     	let $GalleryStore;
     	validate_store(GalleryStore, "GalleryStore");
-    	component_subscribe($$self, GalleryStore, $$value => $$invalidate(24, $GalleryStore = $$value));
+    	component_subscribe($$self, GalleryStore, $$value => $$invalidate(2, $GalleryStore = $$value));
     	let { $$slots: slots = {}, $$scope } = $$props;
     	validate_slots("Lightbox", slots, []);
     	let loaded = false;
+    	let showFullDescription = true;
     	let slideDirection = "";
 
     	// let scale = 1;
@@ -5163,11 +5526,12 @@
     	const closeMe = () => {
     		slideDirection = "";
     		$$invalidate(0, loaded = false);
+    		$$invalidate(4, showFullDescription = true);
 
     		// scale = 1;
     		if (zoomer) {
     			zoomer.destroy();
-    			$$invalidate(23, zoomer = null);
+    			$$invalidate(27, zoomer = null);
     		}
 
     		GalleryStore.closeLightbox();
@@ -5187,7 +5551,7 @@
     			}; // width: workingWidth,
     			// height: workingHeight
 
-    			$$invalidate(23, zoomer = WZoom.create(imgEl, zoomProps));
+    			$$invalidate(27, zoomer = WZoom.create(imgEl, zoomProps));
     			console.log("zoomer!", zoomer);
     		}
     	};
@@ -5282,10 +5646,10 @@
 
     		if (zoomer) {
     			zoomer.destroy();
-    			$$invalidate(23, zoomer = null);
+    			$$invalidate(27, zoomer = null);
     		}
 
-    		$$invalidate(3, arrived = false);
+    		$$invalidate(6, arrived = false);
 
     		const nextIndex = currentIndex === $GalleryStore.images.length - 1
     		? 0
@@ -5316,10 +5680,10 @@
 
     		if (zoomer) {
     			zoomer.destroy();
-    			$$invalidate(23, zoomer = null);
+    			$$invalidate(27, zoomer = null);
     		}
 
-    		$$invalidate(3, arrived = false);
+    		$$invalidate(6, arrived = false);
 
     		const priorIndex = currentIndex === 0
     		? $GalleryStore.images.length - 1
@@ -5345,6 +5709,10 @@
     		);
     	};
 
+    	const toggleDescription = () => {
+    		$$invalidate(4, showFullDescription = !showFullDescription);
+    	};
+
     	onMount(reset);
     	const writable_props = [];
 
@@ -5355,7 +5723,7 @@
     	function img_binding($$value) {
     		binding_callbacks[$$value ? "unshift" : "push"](() => {
     			imgEl = $$value;
-    			$$invalidate(2, imgEl);
+    			$$invalidate(5, imgEl);
     		});
     	}
 
@@ -5375,6 +5743,7 @@
     		IconChevronRight,
     		IconX,
     		loaded,
+    		showFullDescription,
     		slideDirection,
     		imgEl,
     		zoomer,
@@ -5394,6 +5763,7 @@
     		slideIn,
     		showNext,
     		showPrior,
+    		toggleDescription,
     		active,
     		$GalleryStore,
     		current,
@@ -5421,31 +5791,32 @@
 
     	$$self.$inject_state = $$props => {
     		if ("loaded" in $$props) $$invalidate(0, loaded = $$props.loaded);
+    		if ("showFullDescription" in $$props) $$invalidate(4, showFullDescription = $$props.showFullDescription);
     		if ("slideDirection" in $$props) slideDirection = $$props.slideDirection;
-    		if ("imgEl" in $$props) $$invalidate(2, imgEl = $$props.imgEl);
-    		if ("zoomer" in $$props) $$invalidate(23, zoomer = $$props.zoomer);
+    		if ("imgEl" in $$props) $$invalidate(5, imgEl = $$props.imgEl);
+    		if ("zoomer" in $$props) $$invalidate(27, zoomer = $$props.zoomer);
     		if ("active" in $$props) $$invalidate(1, active = $$props.active);
-    		if ("current" in $$props) $$invalidate(25, current = $$props.current);
-    		if ("arrived" in $$props) $$invalidate(3, arrived = $$props.arrived);
-    		if ("currentIndex" in $$props) $$invalidate(26, currentIndex = $$props.currentIndex);
-    		if ("imgData" in $$props) $$invalidate(27, imgData = $$props.imgData);
-    		if ("data" in $$props) $$invalidate(28, data = $$props.data);
-    		if ("fileName" in $$props) $$invalidate(29, fileName = $$props.fileName);
-    		if ("width" in $$props) $$invalidate(30, width = $$props.width);
-    		if ("height" in $$props) $$invalidate(31, height = $$props.height);
-    		if ("ratio" in $$props) $$invalidate(32, ratio = $$props.ratio);
+    		if ("current" in $$props) $$invalidate(28, current = $$props.current);
+    		if ("arrived" in $$props) $$invalidate(6, arrived = $$props.arrived);
+    		if ("currentIndex" in $$props) $$invalidate(29, currentIndex = $$props.currentIndex);
+    		if ("imgData" in $$props) $$invalidate(3, imgData = $$props.imgData);
+    		if ("data" in $$props) $$invalidate(30, data = $$props.data);
+    		if ("fileName" in $$props) $$invalidate(31, fileName = $$props.fileName);
+    		if ("width" in $$props) $$invalidate(32, width = $$props.width);
+    		if ("height" in $$props) $$invalidate(33, height = $$props.height);
+    		if ("ratio" in $$props) $$invalidate(34, ratio = $$props.ratio);
     		if ("workingHeight" in $$props) workingHeight = $$props.workingHeight;
     		if ("workingWidth" in $$props) workingWidth = $$props.workingWidth;
     		if ("photoClass" in $$props) photoClass = $$props.photoClass;
-    		if ("alt" in $$props) $$invalidate(4, alt = $$props.alt);
-    		if ("src" in $$props) $$invalidate(5, src = $$props.src);
-    		if ("srcset" in $$props) $$invalidate(6, srcset = $$props.srcset);
-    		if ("svgSequence" in $$props) $$invalidate(7, svgSequence = $$props.svgSequence);
-    		if ("svgHeight" in $$props) $$invalidate(8, svgHeight = $$props.svgHeight);
-    		if ("svgWidth" in $$props) $$invalidate(9, svgWidth = $$props.svgWidth);
-    		if ("lightboxClass" in $$props) $$invalidate(10, lightboxClass = $$props.lightboxClass);
-    		if ("photoSvgClass" in $$props) $$invalidate(11, photoSvgClass = $$props.photoSvgClass);
-    		if ("photoScale" in $$props) $$invalidate(12, photoScale = $$props.photoScale);
+    		if ("alt" in $$props) $$invalidate(7, alt = $$props.alt);
+    		if ("src" in $$props) $$invalidate(8, src = $$props.src);
+    		if ("srcset" in $$props) $$invalidate(9, srcset = $$props.srcset);
+    		if ("svgSequence" in $$props) $$invalidate(10, svgSequence = $$props.svgSequence);
+    		if ("svgHeight" in $$props) $$invalidate(11, svgHeight = $$props.svgHeight);
+    		if ("svgWidth" in $$props) $$invalidate(12, svgWidth = $$props.svgWidth);
+    		if ("lightboxClass" in $$props) $$invalidate(13, lightboxClass = $$props.lightboxClass);
+    		if ("photoSvgClass" in $$props) $$invalidate(14, photoSvgClass = $$props.photoSvgClass);
+    		if ("photoScale" in $$props) $$invalidate(15, photoScale = $$props.photoScale);
     	};
 
     	let active;
@@ -5476,102 +5847,105 @@
     	}
 
     	$$self.$$.update = () => {
-    		if ($$self.$$.dirty[0] & /*$GalleryStore*/ 16777216) {
+    		if ($$self.$$.dirty[0] & /*$GalleryStore*/ 4) {
     			 $$invalidate(1, active = $GalleryStore.active);
     		}
 
-    		if ($$self.$$.dirty[0] & /*$GalleryStore*/ 16777216) {
-    			 $$invalidate(25, current = $GalleryStore.current);
+    		if ($$self.$$.dirty[0] & /*$GalleryStore*/ 4) {
+    			 $$invalidate(28, current = $GalleryStore.current);
     		}
 
-    		if ($$self.$$.dirty[0] & /*$GalleryStore*/ 16777216) {
-    			 $$invalidate(3, arrived = $GalleryStore.active);
+    		if ($$self.$$.dirty[0] & /*$GalleryStore*/ 4) {
+    			 $$invalidate(6, arrived = $GalleryStore.active);
     		}
 
-    		if ($$self.$$.dirty[0] & /*$GalleryStore, current*/ 50331648) {
-    			 $$invalidate(26, currentIndex = $GalleryStore.images.findIndex(next => next.fileName === current));
+    		if ($$self.$$.dirty[0] & /*$GalleryStore, current*/ 268435460) {
+    			 $$invalidate(29, currentIndex = $GalleryStore.images.findIndex(next => next.fileName === current));
     		}
 
-    		if ($$self.$$.dirty[0] & /*$GalleryStore, currentIndex*/ 83886080) {
-    			 $$invalidate(27, imgData = $GalleryStore.images[currentIndex]);
+    		if ($$self.$$.dirty[0] & /*$GalleryStore, currentIndex*/ 536870916) {
+    			 $$invalidate(3, imgData = $GalleryStore.images[currentIndex]);
     		}
 
-    		if ($$self.$$.dirty[0] & /*imgData*/ 134217728) {
-    			 $$invalidate(28, data = imgData || dummyImage);
+    		if ($$self.$$.dirty[0] & /*imgData*/ 8) {
+    			 $$invalidate(30, data = imgData || dummyImage);
     		}
 
-    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
-    			 $$invalidate(29, fileName = data.fileName);
+    		if ($$self.$$.dirty[0] & /*data*/ 1073741824) {
+    			 $$invalidate(31, fileName = data.fileName);
     		}
 
-    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
-    			 $$invalidate(30, width = data.width);
+    		if ($$self.$$.dirty[0] & /*data*/ 1073741824) {
+    			 $$invalidate(32, width = data.width);
     		}
 
-    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
-    			 $$invalidate(31, height = data.height);
+    		if ($$self.$$.dirty[0] & /*data*/ 1073741824) {
+    			 $$invalidate(33, height = data.height);
     		}
 
-    		if ($$self.$$.dirty[0] & /*width*/ 1073741824 | $$self.$$.dirty[1] & /*height*/ 1) {
-    			 $$invalidate(32, ratio = height / width);
+    		if ($$self.$$.dirty[1] & /*height, width*/ 6) {
+    			 $$invalidate(34, ratio = height / width);
     		}
 
-    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
+    		if ($$self.$$.dirty[0] & /*data*/ 1073741824) {
     			 workingHeight = calcHeight(data);
     		}
 
-    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
+    		if ($$self.$$.dirty[0] & /*data*/ 1073741824) {
     			 workingWidth = calcWidth(data);
     		}
 
-    		if ($$self.$$.dirty[1] & /*ratio*/ 2) {
+    		if ($$self.$$.dirty[1] & /*ratio*/ 8) {
     			 photoClass = "photo " + (ratio > 1 ? "tall" : ratio < 1 ? "wide" : "square");
     		}
 
-    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
-    			 $$invalidate(4, alt = data.title || "image");
+    		if ($$self.$$.dirty[0] & /*data*/ 1073741824) {
+    			 $$invalidate(7, alt = data.title || "image");
     		}
 
-    		if ($$self.$$.dirty[0] & /*active, fileName*/ 536870914) {
-    			 $$invalidate(5, src = active ? getSizedPath("small", fileName) : "");
+    		if ($$self.$$.dirty[0] & /*active*/ 2 | $$self.$$.dirty[1] & /*fileName*/ 1) {
+    			 $$invalidate(8, src = active ? getSizedPath("small", fileName) : "");
     		}
 
-    		if ($$self.$$.dirty[0] & /*active, zoomer, fileName*/ 545259522) {
-    			 $$invalidate(6, srcset = !active
+    		if ($$self.$$.dirty[0] & /*active, zoomer*/ 134217730 | $$self.$$.dirty[1] & /*fileName*/ 1) {
+    			 $$invalidate(9, srcset = !active
     			? ""
     			: Boolean(zoomer)
     				? getSizedPath("large", fileName) + " 300w"
     				: srcSizes.map(getSrcSizes(fileName)).join(","));
     		}
 
-    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
-    			 $$invalidate(7, svgSequence = data.svgSequence);
+    		if ($$self.$$.dirty[0] & /*data*/ 1073741824) {
+    			 $$invalidate(10, svgSequence = data.svgSequence);
     		}
 
-    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
-    			 $$invalidate(8, svgHeight = data.svgHeight);
+    		if ($$self.$$.dirty[0] & /*data*/ 1073741824) {
+    			 $$invalidate(11, svgHeight = data.svgHeight);
     		}
 
-    		if ($$self.$$.dirty[0] & /*data*/ 268435456) {
-    			 $$invalidate(9, svgWidth = data.svgWidth);
+    		if ($$self.$$.dirty[0] & /*data*/ 1073741824) {
+    			 $$invalidate(12, svgWidth = data.svgWidth);
     		}
 
     		if ($$self.$$.dirty[0] & /*active*/ 2) {
-    			 $$invalidate(10, lightboxClass = "lightbox" + (active ? " active" : ""));
+    			 $$invalidate(13, lightboxClass = "lightbox" + (active ? " active" : ""));
     		}
 
     		if ($$self.$$.dirty[0] & /*loaded*/ 1) {
-    			 $$invalidate(11, photoSvgClass = "photo-svg" + (loaded ? " image-loaded" : ""));
+    			 $$invalidate(14, photoSvgClass = "photo-svg" + (loaded ? " image-loaded" : ""));
     		}
 
-    		if ($$self.$$.dirty[0] & /*width*/ 1073741824 | $$self.$$.dirty[1] & /*height*/ 1) {
-    			 $$invalidate(12, photoScale = composeScale(height, width));
+    		if ($$self.$$.dirty[1] & /*height, width*/ 6) {
+    			 $$invalidate(15, photoScale = composeScale(height, width));
     		}
     	};
 
     	return [
     		loaded,
     		active,
+    		$GalleryStore,
+    		imgData,
+    		showFullDescription,
     		imgEl,
     		arrived,
     		alt,
@@ -5593,11 +5967,10 @@
     		slideIn,
     		showNext,
     		showPrior,
+    		toggleDescription,
     		zoomer,
-    		$GalleryStore,
     		current,
     		currentIndex,
-    		imgData,
     		data,
     		fileName,
     		width,
@@ -6820,11 +7193,13 @@
     function create_each_block$2(key_1, ctx) {
     	let first;
     	let galleryitembasic;
+    	let t;
     	let current;
 
     	galleryitembasic = new GalleryItemBasic({
     			props: {
     				imgData: /*imgData*/ ctx[1],
+    				hideItem: false,
     				viewLightbox: GalleryStore.viewLightbox
     			},
     			$$inline: true
@@ -6836,11 +7211,13 @@
     		c: function create() {
     			first = empty();
     			create_component(galleryitembasic.$$.fragment);
+    			t = text("\r\n            }");
     			this.first = first;
     		},
     		m: function mount(target, anchor) {
     			insert_dev(target, first, anchor);
     			mount_component(galleryitembasic, target, anchor);
+    			insert_dev(target, t, anchor);
     			current = true;
     		},
     		p: function update(ctx, dirty) {
@@ -6860,6 +7237,7 @@
     		d: function destroy(detaching) {
     			if (detaching) detach_dev(first);
     			destroy_component(galleryitembasic, detaching);
+    			if (detaching) detach_dev(t);
     		}
     	};
 
@@ -7087,33 +7465,52 @@
     	}
     }
 
-    const startApp = galleryData => {
+    const hydrateNavData = galleryData => {
+        window.NAV_DATA = window.NAV_DATA || {};
+        window.NAV_DATA.currentURL = galleryData.url;
+    };
 
-        if (!galleryData) {
-            console.error('GalleryData not found');
-            return;
+    const hydrateAlbum = album => {
+        const { images, svgSequences } = album;
+        for (const image of images) {
+            image.id = image.fileName;
+            image.svgSequence = svgSequences[image.fileName];
         }
+    };
 
-        const title = (galleryData.title ? galleryData.title : '') +
-            (galleryData.subtitle_A ? ' | ' + galleryData.subtitle_A : '');
+    const hydrateTitle = albmum => {
+        const title = (albmum.title ? albmum.title : '') +
+            (albmum.subtitle_A ? ' | ' + albmum.subtitle_A : '');
 
         if (title) {
             document.title = title;
             const titleBar = document.querySelector('#headerBar .page-header-title');
             titleBar.innerHTML = title;
         }
+    };
+
+    const composeStartup = App => albumData => {
+
+        if (!albumData) {
+            console.error('GalleryData not found');
+            return;
+        }
+
+        hydrateTitle(albumData);
+        hydrateAlbum(albumData);
+        hydrateNavData(albumData);
+
+        GalleryStore.set(albumData);
 
         // eslint-disable-next-line no-unused-vars
-        const app = new AlbumBasic({
+        const app = new App({
             target: document.getElementById('mainApp'),
             props: {}
         });
 
-        GalleryStore.set(galleryData);
-
     };
 
-    window.StartApp = startApp;
+    window.StartApp = composeStartup(AlbumBasic);
 
 }());
 //# sourceMappingURL=album-basic.js.map

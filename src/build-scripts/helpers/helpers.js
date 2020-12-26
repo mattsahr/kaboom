@@ -120,9 +120,19 @@ const waitSerial = (batch, finalize, REPORT) => {
     iterate.proceed();
 };
 
+const next = function() {
+    const args = Array.prototype.slice.call(arguments);
+    const func = args.shift();
+
+    return () => {
+        func(args[0], args[1], args[3]);
+    };
+};
+
 module.exports = { 
     checkFile,
     copyFile,
+    next,
     replaceLastOrAdd,
     waitParallel,
     waitSerial

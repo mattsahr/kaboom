@@ -1,12 +1,12 @@
     <script type="text/javascript">
         "use strict";
 
-        const APP_FILE_NAME = '__app_file_name__';
-        const NETWORK_API_FILE_NAME = '__API_file_name__';
+        var APP_FILE_NAME = '__app_file_name__';
+        var NETWORK_API_FILE_NAME = '__API_file_name__';
 
         (function() {
-            const composeStartCache = function(appName) {
-                const cache = {};
+            var composeStartCache = function(appName) {
+                var cache = {};
 
                 return function (source) { 
                     return function (payload) {
@@ -32,8 +32,8 @@
 
             };
 
-            const kickstart = composeStartCache('StartApp');
-            const navstart = composeStartCache('NavApp');
+            var kickstart = composeStartCache('StartApp');
+            var navstart = composeStartCache('NavApp');
 
             function makeRequest (method, url) {
                 return new Promise(function (resolve, reject) {
@@ -59,11 +59,11 @@
                 });
             }
 
-            const loadData = function () {
+            var loadData = function () {
 
                 makeRequest('GET', 'album-meta.json')
                     .then(function (data) {
-                        const galleryData = JSON.parse(data);
+                        var galleryData = JSON.parse(data);
                         kickstart('data')(galleryData);
                     })
                     .catch(function (err) {
@@ -72,10 +72,10 @@
 
             };
 
-            const loadNavData = function () {
+            var loadNavData = function () {
                 makeRequest('GET', '/nav-meta.json')
                     .then(function (data) {
-                        const navData = JSON.parse(data);
+                        var navData = JSON.parse(data);
                         navstart('data')(navData);
                     })
                     .catch(function (err) {
@@ -84,7 +84,7 @@
             };
 
             var loadScript = function (src, callback) {
-                const fileRequest = document.createElement('script');
+                var fileRequest = document.createElement('script');
                 fileRequest.setAttribute('async', true);
                 fileRequest.setAttribute('type', "text/javascript");
                 fileRequest.setAttribute('src', src);
@@ -92,16 +92,16 @@
                 document.getElementsByTagName("head")[0].appendChild(fileRequest);
             }
 
-            const loadApp = function () {
+            var loadApp = function () {
                 loadData();
-                loadScript('__app/' + APP_FILE_NAME, kickstart('app'));
+                loadScript(APP_FILE_NAME, kickstart('app'));
             };
 
-            const loadNav =function () {
+            var loadNav =function () {
                 loadNavData();
 
                 if (NETWORK_API_FILE_NAME) { 
-                    loadScript('/' + NETWORK_API_FILE_NAME);
+                    loadScript(NETWORK_API_FILE_NAME);
                 } else {
                     console.log('NO NETWORK_API_FILE_NAME');
                 }

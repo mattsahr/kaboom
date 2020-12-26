@@ -33,8 +33,6 @@ const buildCommand = (sourcePath, destinationPath) =>
 const primitiveSVG = (sourcePath, destinationPath, successCallback) => {
     const command = buildCommand(sourcePath, destinationPath);
 
-    successCallback(destinationPath);
-
     // eslint-disable-next-line no-unused-vars
     exec(command, (err, stdout, stderr) => {
         if (err) {

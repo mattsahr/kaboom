@@ -4,6 +4,7 @@
     import GalleryStore from '../../store/store';
     import Flatpickr from 'svelte-flatpickr/src/Flatpickr.svelte';
     import Tags from "svelte-tags-input";
+    import Toggle from './Toggle.svelte';
 
     window.NAV_DATA = window.NAV_DATA || {};
     window.NAV_DATA.categories = window.NAV_DATA.categories || [
@@ -72,10 +73,14 @@
         onPanelBlur();
     };
 
-    const onPanelBlur = (e) => {
-        if (e) {
-            console.log('event!', e);
-        }
+    /*
+    const onToggleChange = e => {
+        console.log('onToggleChange!', e);
+        // $GalleryStore.restrictDownloads = !$GalleryStore.restrictDownloads;
+    };
+    */
+
+    const onPanelBlur = () => {
         GalleryStore.updateMeta({ date: dateValue, navCategories });
     };
 
@@ -116,6 +121,14 @@
                 <input id="gallery-subtitle_B" on:blur={onPanelBlur} 
                     bind:value={$GalleryStore.subtitle_B}>
             </div>
+
+
+            <div class="entry-block wide">
+                <label for="allowDownloads">Photo Downloads</label>
+                <Toggle bind:checked={$GalleryStore.allowDownloads} 
+                    onLabel="Enabled" offLabel="Disabled" name="allowDownloads" />
+            </div>
+
 
             <div class="entry-block double">
                  <label for="gallery-nav-categories">Nav Categories</label>
@@ -164,7 +177,7 @@
     }
 
     .control-panel.open {
-        height: 230px;
+        height: 250px;
         opacity: 1;
         border-color: rgb(200, 200, 200);
         overflow: visible;
@@ -189,11 +202,21 @@
         margin: 0 0 16px 0;
     }
 
+    .entry-block.wide {
+        width: 100%;
+        max-width: 550px;
+        margin: 2px 0 0 0;
+    }
+
+    .entry-block :global(.toggle) {
+        width: 130px;
+    }
+
     .entry-block.double {
         width: 100%;
         max-width: 550px;
         display: block;
-        margin: -2px -48px 0 0;
+        margin: 0 -48px 0 0;
     }
 
     label {

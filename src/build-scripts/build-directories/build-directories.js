@@ -39,72 +39,69 @@ const buildDirectories = (() => {
             if (stat.isDirectory()) { staticAlbums.push(albumPath); }
         }
 
-        console.log('staticAlbums', staticAlbums.length);
+        console.log(' ');
+        console.log('static albums:', staticAlbums.length);
 
-        if (staticAlbums.length === 0) {
+        const galleryActiveNames = await fs.promises.readdir(GALLERY_ACTIVE_PATH);
+        const activeAlbums = [];
+        for (const name of galleryActiveNames) {
+            const albumPath = path.join(GALLERY_ACTIVE_PATH, name);
+            const stat = await fs.promises.stat(albumPath);
+            if (stat.isDirectory()) { activeAlbums.push(albumPath); }
+        }
 
-            const galleryActiveNames = await fs.promises.readdir(GALLERY_ACTIVE_PATH);
-            const activeAlbums = [];
-            for (const name of galleryActiveNames) {
-                const albumPath = path.join(GALLERY_ACTIVE_PATH, name);
-                const stat = await fs.promises.stat(albumPath);
-                if (stat.isDirectory()) { activeAlbums.push(albumPath); }
-            }
+        console.log(' ');
+        console.log('active albums:', activeAlbums.length);
 
-            console.log('activeAlbums', activeAlbums);
+        if (staticAlbums.length === 0 && activeAlbums.length === 0) {
 
-            if (activeAlbums.length === 0) {
+            const albumPath = path.join(GALLERY_ACTIVE_PATH, DEMO_ALBUM);
+            const imageDirPath = path.join(
+                GALLERY_ACTIVE_PATH, 
+                DEMO_ALBUM, 
+                DEFAULT_IMAGE_DIRECTORY
+            );
+            fs.mkdirSync(albumPath);
+            fs.mkdirSync(imageDirPath);
 
-                const albumPath = path.join(GALLERY_ACTIVE_PATH, DEMO_ALBUM);
-                const imageDirPath = path.join(
+            let pixCount = 0;
+
+            const copyCallback = (src, dest) => err => {
+                if (err) {
+                    console.log('copy error ' + src + ' >> ' + dest);
+                    console.log(err);
+                } else {
+                    pixCount++;
+                    if (pixCount >= DEMO_PIX.length) {
+                        if (successCallback) { successCallback(); }
+                    }
+                }
+            };
+
+            for (const pic of DEMO_PIX) {
+                const source = path.join(DUMMY_RESOURCE_PATH, pic);
+                const destination = path.join(
                     GALLERY_ACTIVE_PATH, 
                     DEMO_ALBUM, 
-                    DEFAULT_IMAGE_DIRECTORY
+                    DEFAULT_IMAGE_DIRECTORY, 
+                    pic
                 );
-                fs.mkdirSync(albumPath);
-                fs.mkdirSync(imageDirPath);
 
-                let pixCount = 0;
+                const callback = copyCallback(source, destination);
 
-                const copyCallback = (src, dest) => err => {
-                    if (err) {
-                        console.log('copy error ' + src + ' >> ' + dest);
-                        console.log(err);
-                    } else {
-                        pixCount++;
-                        if (pixCount >= DEMO_PIX.length) {
-                            if (successCallback) { successCallback(); }
-                        }
-                    }
-                };
+                copyFile(source, destination,  callback);
 
-                for (const pic of DEMO_PIX) {
-                    const source = path.join(DUMMY_RESOURCE_PATH, pic);
-                    const destination = path.join(
-                        GALLERY_ACTIVE_PATH, 
-                        DEMO_ALBUM, 
-                        DEFAULT_IMAGE_DIRECTORY, 
-                        pic
-                    );
-
-                    const callback = copyCallback(source, destination);
-
-                    copyFile(source, destination,  callback);
-
-                }
-
-
-                console.log('added album: ' + GALLERY_ACTIVE_PATH + '/' + DEMO_ALBUM);
-
-            } else {
-                if (successCallback) { successCallback(); }
             }
+
+
+            console.log('added album: ' + GALLERY_ACTIVE_PATH + '/' + DEMO_ALBUM);
 
         } else {
             if (successCallback) { successCallback(); }
         }
     };
 
+    /*
     const addDummyJson = (successCallback) => {
         const appJsonPath = path.join(APP_DIRECTORY, ALBUM_META_JSON);
         if (!fs.existsSync(appJsonPath)){
@@ -161,23 +158,21 @@ const buildDirectories = (() => {
             if (successCallback) { successCallback(); }
         }
     };
-
+    */
 
     return async (successCallback) => {
 
-        // waitParallel(
         waitSerial(
             {
                 buildStaticGallery,
                 buildActiveGallery,
-                populateActiveGallery,
-                addDummyJson,
-                addDummyImages
-            }, 
-            successCallback,
-            'REPORT'
+                populateActiveGallery
+                // addDummyJson,
+                // addDummyImages
+            },
+            successCallback
+            // 'REPORT'
         );
-
 
     };
 

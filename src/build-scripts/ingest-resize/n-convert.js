@@ -5,11 +5,11 @@
 
 const { exec } = require('child_process');
 
-const base = 'nconvert -ratio -rtype lanczos -rexifthumb -opthuff -overwrite ';
+const base = 'nconvert -out jpeg -ratio -rtype lanczos -rexifthumb -opthuff -overwrite ';
 
 const commands = {
     microscopic: base + ' -q 7 -rmeta -resize longest  100 -i ',
-    // png:         base + '-out png -clevel 3 -resize longest  120 -i ',
+    // png:      base + '-out png -clevel 3 -resize longest  120 -i ',
     tiny:        base + '-q 60 -resize longest  400 -i ',
     small:       base + '-q 65 -resize longest  700 -i ',
     medium:      base + '-q 70 -resize longest 1200 -i ',
@@ -18,8 +18,6 @@ const commands = {
 
 const nConvert = (size, filepath, successCallback) => {
     const command = commands[size] + filepath;
-
-    successCallback(filepath);
 
     // eslint-disable-next-line no-unused-vars
     exec(command, (err, stdout, stderr) => {

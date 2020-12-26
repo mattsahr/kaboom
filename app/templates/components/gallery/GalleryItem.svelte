@@ -2,9 +2,13 @@
     import Intersector from './Intersector.svelte';
     import GalleryImage from './GalleryImage.svelte';
     import GalleryDescription from './GalleryDescription.svelte';
+    import HideButton from './HideButton.svelte';
+    import UnHideButton from './UnHideButton.svelte';
 
     export let imgData;
     export let mode;
+    export let hideItem = false;
+    export let unhideItem = false;
     export let viewLightbox = () => false;
     export let updateDescription = () => false;
     // console.log('imgData', imgData);
@@ -16,6 +20,14 @@
 
 
 <div class={frameClass}>
+    {#if hideItem}
+        <HideButton {hideItem} {imgData} />
+    {/if}
+
+    {#if unhideItem}
+        <UnHideButton {unhideItem} {imgData} />
+    {/if}
+
     <Intersector once={true} let:intersecting={intersecting}>
         <GalleryImage {viewLightbox} {imgData} show={intersecting} />
     </Intersector>
@@ -41,6 +53,10 @@
 
     .photo-frame.arrange {
         padding: 20px 10px 10px 10px;
+    }
+
+    .photo-frame.arrange :global(.photo-inner-frame.photo-inner-frame) {
+        margin-bottom: 24px;
     }
 
     @media all and (max-width: 800px) {

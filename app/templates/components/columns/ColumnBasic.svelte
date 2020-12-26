@@ -9,8 +9,9 @@
 <div class="column-board">
     <div class="gallery-list">
         {#each $GalleryStore.images as imgData(imgData.fileName)}
-            <GalleryItemBasic {imgData} 
+            <GalleryItemBasic {imgData} hideItem={false}
                 viewLightbox={GalleryStore.viewLightbox}  />
+            }
         {/each}
     </div>
 </div>

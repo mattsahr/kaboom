@@ -1,33 +1,34 @@
 <script>
     import { fly } from 'svelte/transition';
+    import { writable } from "svelte/store";
     import MdArrowDropDown from 'svelte-icons/md/MdArrowDropDown.svelte';
     import MdArrowDropUp from 'svelte-icons/md/MdArrowDropUp.svelte';
     import MdBrightnessLow from 'svelte-icons/md/MdBrightnessLow.svelte';
     import MdClose from 'svelte-icons/md/MdClose.svelte';
     import MdAdjust from 'svelte-icons/md/MdAdjust.svelte';
-    import modalize from './modalize';
+    import initModal from './modalize';
 
     export let orderType;
     export let sortDirection;
-    export let showSwitcher;
     export let sortMethods = {};
     export let activeSort;
     export let updateMeta = () => false;
 
-    let switcherEl;
-    let switcherListener;
-
+    const shown = writable(false);
+    const dom = {};
+    // let switcherListener;
 
     const toggleSwitcher = () => {
-        showSwitcher.set(true);
-        setTimeout(() => {
-            switcherListener = modalize(switcherEl, showSwitcher, switcherListener);
-        }, 50);
+        shown.set(true);
+
+        // setTimeout(() => {
+        //     switcherListener = modalize(switcherEl, showSwitcher, switcherListener);
+        // }, 50);
     };
 
     const closeSwitcher = () => {
-        modalize(null, null, switcherListener);
-        showSwitcher.set(false);
+        // modalize(null, null, switcherListener);
+        shown.set(false);
     };
 
     const toggleGroup = () => {
@@ -58,14 +59,16 @@
     const getSortClass = (type, active) => 
         'switch-option sort-type' + (active === sortMethods[type] ? ' active' : '');
 
+    initModal(dom, 'switcher', shown);
+
 </script>
 
 <!-- ====================================== HTML =============================================== -->
 
 
 <div class="switcher-bug" on:click={toggleSwitcher}><MdBrightnessLow /></div>
-{#if $showSwitcher}
-    <div class="list-switcher" transition:fly={{ y: -150, duration: 400 }} bind:this={switcherEl}>
+{#if $shown}
+    <div class="list-switcher" transition:fly={{ y: -150, duration: 400 }} bind:this={dom.switcher}>
 
             <div class="close-me" on:click={closeSwitcher}><MdClose /></div>
 

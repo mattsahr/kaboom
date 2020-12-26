@@ -74,7 +74,8 @@ const hydrateJSON = async (albumDirectory, size, originals, successCallback) => 
     
     let albumMeta = {
         images: [],
-        url: albumDirectory.split('/').pop()
+        svgSequences: {},
+        url: path.basename(albumDirectory) // albumDirectory.split('\\').pop()
     };
 
     const metaPath = path.join(albumDirectory, 'album-meta.json');
@@ -86,6 +87,14 @@ const hydrateJSON = async (albumDirectory, size, originals, successCallback) => 
         albumMeta = JSON.parse(albumMeta);
         console.log('already got albumMeta!');
         albumMeta.url = albumDirectory.split('/').pop();
+
+        albumMeta.svgSequences = albumMeta.svgSequences || {};
+        for (const image of albumMeta.images) {
+            if (image.svgSequence) { 
+                albumMeta.svgSequences[image.fileName] = image.svgSequence;
+                delete image.svgSequence;
+            }
+        }
     } 
 
     const imageDirectory = path.join(albumDirectory, size);
@@ -109,36 +118,61 @@ const hydrateJSON = async (albumDirectory, size, originals, successCallback) => 
                 JSON.stringify(sequence).length
             );
 
-            const baseFileName = replaceLastOrAdd(fileName, size, 'jpg');
-            const original = await Jimp.read(path.join(originalDirectory, baseFileName));
+            const imgTypes = [ 'jpg', 'jpeg', 'png', 'gif' ];
 
-            const currentMeta = albumMeta.images.find(next => next.fileName === baseFileName);
+            let baseFileName;
+            let original;
+            let imgFound = false;
 
-            if (currentMeta) {
-                currentMeta.id = baseFileName;
+            while (!imgFound) {
+                try {
+                    baseFileName = replaceLastOrAdd(fileName, size, imgTypes.shift());
+                    original = await Jimp.read(path.join(originalDirectory, baseFileName));
+                    imgFound = true;
+                } catch {
+                    if (!imgTypes.length) {
+                        console.error(albumDirectory, 'NO IMAGE FOUND', baseFileName);
+                        baseFileName = false;
+                        imgFound = true;
+                        // process.exit(1);
+                    }
+                }
+            }
 
-                currentMeta.width = original.bitmap.width;
-                currentMeta.height = original.bitmap.height;
+            if (baseFileName) {
 
-                currentMeta.svgSequence = sequence;
-                currentMeta.svgHeight = height;
-                currentMeta.svgWidth = width;
+                const currentMeta = albumMeta.images.find(next => next.fileName === baseFileName);
 
-            } else {
-                const nextImage = {
-                    id: baseFileName,
-                    fileName: baseFileName,
+                if (currentMeta) {
+                    // currentMeta.id = baseFileName;
 
-                    width: original.bitmap.width,
-                    height: original.bitmap.height,
+                    currentMeta.width = original.bitmap.width;
+                    currentMeta.height = original.bitmap.height;
 
-                    title: baseFileName,
-                    description: '',
-                    svgSequence: sequence,
-                    svgHeight: height,
-                    svgWidth: width
-                };
-                albumMeta.images.push(nextImage);
+                    // currentMeta.svgSequence = sequence;
+                    currentMeta.svgHeight = height;
+                    currentMeta.svgWidth = width;
+
+                    albumMeta.svgSequences[baseFileName] = sequence;
+
+                } else {
+                    const nextImage = {
+                        // id: baseFileName,
+                        fileName: baseFileName,
+
+                        width: original.bitmap.width,
+                        height: original.bitmap.height,
+
+                        title: baseFileName,
+                        description: '',
+                        // svgSequence: sequence,
+                        svgHeight: height,
+                        svgWidth: width
+                    };
+                    albumMeta.svgSequences[baseFileName] = sequence;
+                    albumMeta.images.push(nextImage);
+                }
+
             }
 
         } else {

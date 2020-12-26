@@ -16,6 +16,7 @@
     import IconX from '../icons/IconX.svelte';
 
     let loaded = false;
+    let showFullDescription = true;
     let slideDirection = '';
     // let scale = 1;
     let imgEl;
@@ -33,6 +34,7 @@
     const closeMe = () => { 
         slideDirection = '';
         loaded = false;
+        showFullDescription = true;
         // scale = 1;
         if (zoomer) { 
             zoomer.destroy(); 
@@ -206,9 +208,16 @@
 
     };
 
+    const toggleDescription = () => {
+        showFullDescription = !showFullDescription;
+    };
+
     onMount(reset);
 
 </script>
+
+<!-- ====================================== HTML =============================================== -->
+
 
 {#if active}
 <div class={lightboxClass} in:fade out:fade>
@@ -246,13 +255,38 @@
     </div>
     {/if} <!-- end if arrived -->
 
-    <div class="description-panel">
-        <div class="description"></div>
-        <div class="download-button">Download</div>
-    </div>
+    {#each [imgData] as count (imgData) }
+        <div in:fade out:fade class={'description-panel' + (showFullDescription ? '' : ' collapsed')}>
+            <div class="description-column">
+
+                <div class="description-expand-toggle" on:click={toggleDescription}>
+                    {#if showFullDescription}
+                        <IconChevronRight />
+                    {:else}
+                        <IconChevronLeft />
+                    {/if}
+                </div>
+
+                <div class="description">{@html imgData.description}</div>
+
+                {#if $GalleryStore.allowDownloads}
+                    <a class="download-button" 
+                        href={'__original/' + imgData.fileName} 
+                        download={imgData.fileName} >
+                            Download
+                            <IconChevronRight />
+                    </a>
+                {/if}
+
+            </div>
+        </div>
+    {/each}
+
 </div>
 {/if}
 
+
+<!-- ====================================== STYLES ============================================= -->
 <style>
     .lightbox {
         position: fixed;
@@ -402,10 +436,78 @@
     .description-panel {
         position: absolute;
         bottom: 0;
-        right: 0; 
+        right: 0;
         left: 0;
-        height: 200px;
-        background-color: rgba(0, 0, 0, 0.4);
+        min-height: 120px;
+        background-color: rgba(0, 0, 0, 0.7);
+        transition: height 400ms, min-height 400ms;
     }
+
+    .description-panel.collapsed {
+        overflow: hidden;
+        height: 40px;
+        min-height: 40px;
+    }
+
+    .description-column {
+        position: relative;
+        width: 100%;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 34px 60px 28px 60px;
+        color: rgb(220, 220, 220);
+        font-size: 13px;
+    }
+
+    .description-expand-toggle {
+        position: absolute;
+        top: 0;
+        right: 100px;
+        width: 40px;
+        height: 30px;
+        cursor: pointer;
+        opacity: 0.4;
+    }
+
+    .description-expand-toggle:hover {
+        opacity: 1;
+    }
+
+    .description-expand-toggle :global(svg) {
+        transform: rotate(90deg) scale(0.5) translate(-20px, 0);
+    }
+
+    .description {
+        margin: 0 0 20px 0;
+    }
+
+    .download-button {
+        text-decoration: none;
+        color: rgb(150, 210, 255);
+        font-weight: bold;
+        padding: 10px 20px 10px 20px;
+        margin: 0 0 0 -20px;
+        border-radius: 3px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        position: relative;
+        display: block;
+        width: 114px;        
+    }
+
+    .download-button:hover {
+        background-color: rgb(10, 30, 50);
+        color: rgb(255 255 255);
+    }
+
+    .download-button :global(svg) {
+        display: block;
+        top: -9px;
+        right: 14px;
+        position: absolute;
+        transform: rotate(90deg) scale(0.3);
+    }
+
 
 </style>

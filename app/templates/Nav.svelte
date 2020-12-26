@@ -6,7 +6,7 @@
     import NavList from './components/nav/NavList.svelte';
     import NavItem from './components/nav/NavItem.svelte';
     import ListSwitcher from './components/nav/ListSwitcher.svelte';
-    import modalize from './components/nav/modalize';
+    import initModal  from './components/nav/modalize';
     import { 
         composeNavGroups, 
         getList, 
@@ -14,19 +14,17 @@
     } from './components/nav/nav-helpers';
 
     const custom = {};
+    const dom = {};
     const active = writable(null);
     const orderType = writable('group');
     const sortDirection = writable('ascending');
     const activeSort = writable(sortMethods.date);
-    const showSwitcher = writable(null);
 
     let current;
     let categories = [];
-    let sidebar;
-    let sidebarListener;
 
     const updateMeta = (() => {
-        const getMethod = () => {
+        const getMethodName = () => {
             for (const [methodName, method] of Object.entries(sortMethods)) {
                 if ($activeSort === method) {
                     return methodName;
@@ -39,7 +37,7 @@
             const update = {
                 orderType: $orderType,
                 sortDirection: $sortDirection,
-                sortMethod: getMethod()
+                sortMethod: getMethodName()
             };
 
             NavStore.updateMeta(update);
@@ -48,13 +46,6 @@
     })();
 
     const getSidebarClass = activeState => {
-        if (activeState) { sidebarListener = modalize(sidebar, active, sidebarListener); }
-
-        console.log('orderType', orderType);
-        console.log('$orderType', $orderType);
-        console.log('navGroups', navGroups);
-        console.log('navList', navList);
-
         return 'nav-sidebar' + (activeState ? ' active': '');
     };
 
@@ -91,6 +82,7 @@
         setTimeout(initOptions, 100);
     };
 
+    initModal(dom, 'sidebar', active);
     onMount(initNavButton);
 
 </script>
@@ -98,7 +90,7 @@
 <!-- ====================================== HTML =============================================== -->
 
 
-<div class={sidebarClass} bind:this={sidebar}>
+<div class={sidebarClass} bind:this={dom.sidebar}>
     {#if $active}
 
         <NavItem item={homeItem} {custom} />
@@ -108,7 +100,6 @@
         {/if}
 
         <ListSwitcher 
-            {showSwitcher} 
             {orderType} 
             {sortDirection} 
             {sortMethods} 

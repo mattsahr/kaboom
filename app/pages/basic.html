@@ -11,12 +11,12 @@
     <script type="text/javascript">
         "use strict";
 
-        const APP_FILE_NAME = 'album-basic.js';
-        const NETWORK_API_FILE_NAME = '';
+        var APP_FILE_NAME = '__app/album-basic.js';
+        var NETWORK_API_FILE_NAME = '';
 
         (function() {
-            const composeStartCache = function(appName) {
-                const cache = {};
+            var composeStartCache = function(appName) {
+                var cache = {};
 
                 return function (source) { 
                     return function (payload) {
@@ -42,8 +42,8 @@
 
             };
 
-            const kickstart = composeStartCache('StartApp');
-            const navstart = composeStartCache('NavApp');
+            var kickstart = composeStartCache('StartApp');
+            var navstart = composeStartCache('NavApp');
 
             function makeRequest (method, url) {
                 return new Promise(function (resolve, reject) {
@@ -69,11 +69,11 @@
                 });
             }
 
-            const loadData = function () {
+            var loadData = function () {
 
                 makeRequest('GET', 'album-meta.json')
                     .then(function (data) {
-                        const galleryData = JSON.parse(data);
+                        var galleryData = JSON.parse(data);
                         kickstart('data')(galleryData);
                     })
                     .catch(function (err) {
@@ -82,10 +82,10 @@
 
             };
 
-            const loadNavData = function () {
+            var loadNavData = function () {
                 makeRequest('GET', '/nav-meta.json')
                     .then(function (data) {
-                        const navData = JSON.parse(data);
+                        var navData = JSON.parse(data);
                         navstart('data')(navData);
                     })
                     .catch(function (err) {
@@ -94,7 +94,7 @@
             };
 
             var loadScript = function (src, callback) {
-                const fileRequest = document.createElement('script');
+                var fileRequest = document.createElement('script');
                 fileRequest.setAttribute('async', true);
                 fileRequest.setAttribute('type', "text/javascript");
                 fileRequest.setAttribute('src', src);
@@ -102,16 +102,16 @@
                 document.getElementsByTagName("head")[0].appendChild(fileRequest);
             }
 
-            const loadApp = function () {
+            var loadApp = function () {
                 loadData();
-                loadScript('__app/' + APP_FILE_NAME, kickstart('app'));
+                loadScript(APP_FILE_NAME, kickstart('app'));
             };
 
-            const loadNav =function () {
+            var loadNav =function () {
                 loadNavData();
 
                 if (NETWORK_API_FILE_NAME) { 
-                    loadScript('/' + NETWORK_API_FILE_NAME);
+                    loadScript(NETWORK_API_FILE_NAME);
                 } else {
                     console.log('NO NETWORK_API_FILE_NAME');
                 }
@@ -234,55 +234,6 @@
     </style>
 </head>
 <body>
-    <!-- non-critical CSS, may load late -->
-    <link rel='stylesheet' href='__app/bundle-basic.css'  id="linkAppCSS" media="none">
-    <link rel='stylesheet' href='/bundle-nav.css' id="linkNavCSS" media="none">
-    <link rel='stylesheet' href='__app/global-basic.css' id="linkGlobalCSS" media="none">
-
-    <script type="text/javascript">
-        (function(){
-            var cssTracker = {
-                app: false,
-                nav: false
-            };
-            var clearOverlay = function (arrival) {
-                cssTracker[arrival] = true;
-
-                if (cssTracker.app && cssTracker.nav) {
-                    var spinner = document.getElementById('startup-spinner-overlay');
-                    if (spinner) {
-                        spinner.style.opacity = '0';
-                        setTimeout(function(){
-                            spinner.parentNode.removeChild(spinner);
-                        }, 510);
-                    }
-                }
-
-            };
-
-            var linkApp = document.getElementById('linkAppCSS');
-            var linkNav = document.getElementById('linkNavCSS');
-            var linkGlobal = document.getElementById('linkGlobalCSS');
-
-            linkApp.onload = function() {
-                this.setAttribute('media', 'all');
-                clearOverlay('app');
-            }
-
-            linkNav.onload = function() {
-                this.setAttribute('media', 'all');
-                clearOverlay('nav');
-            }
-
-            linkGlobal.onload = function() {
-                // NOT REQUIRED -- DON'T PARTICIPATE IN OVERLAY CLEARING
-                this.setAttribute('media', 'all');
-            }
-
-        })();
-        
-    </script>
-
     <div id="headerBar" class="header-bar">
         <div class="header-column">
             <div class="menu-button" id="menu-button-01"></div>
@@ -294,6 +245,67 @@
     <div id="navApp"></div>
 
     <div id="startup-spinner-overlay"><div class="startup-spinner"></div></div>
+
+
+    <script type="text/javascript">
+        "use strict";
+
+        var MAIN_CSS_URL = '__app/bundle-basic.css';
+        var GLOBAL_CSS_URL = '';
+        var NAV_CSS_URL = 'bundle-nav.css';
+
+        (function(){
+
+            var requiredCSS = ['app'];
+            var allArrived = false;
+
+            var clearOverlay = function (arrival) {
+
+                if (allArrived) { return; }
+
+                requiredCSS = requiredCSS.filter(function(next) { return next !== arrival; });
+
+                if (requiredCSS.length === 0) {
+                    allArrived = true;
+
+                    var spinner = document.getElementById('startup-spinner-overlay');
+                    if (spinner) {
+                        spinner.style.opacity = '0';
+                        setTimeout(function(){
+                            spinner.parentNode.removeChild(spinner);
+                        }, 510);
+                    }
+                }
+
+            };
+
+            var onSuccess = function(type) { 
+                return function() {
+                    this.setAttribute('media', 'all'); 
+                    clearOverlay(type);
+                };
+            };
+
+            var loadCSS = function (fileName, type) {
+                if (!fileName) { return; }
+
+                var fileRequest = document.createElement('link');
+                fileRequest.setAttribute('rel', 'stylesheet');
+                fileRequest.setAttribute('type', 'text/css');
+                fileRequest.setAttribute('media', 'none');
+                fileRequest.setAttribute('href', fileName);
+                fileRequest.onload = onSuccess(type);
+                document.getElementsByTagName("head")[0].appendChild(fileRequest);
+
+            }
+
+            loadCSS(MAIN_CSS_URL, 'app');
+            loadCSS(GLOBAL_CSS_URL, 'global');
+            loadCSS(NAV_CSS_URL, 'nav');
+
+        })();
+        
+    </script>
 
 </body>
 </html>

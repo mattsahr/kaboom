@@ -10,14 +10,40 @@ const createGalleryStore = () => {
     let GALLERY;
     subscribe(gallery => GALLERY = gallery);
 
+    const save = () => {
+        setTimeout(() => {
+            if (window.Network && window.Network.save) {
+                window.Network.save(GALLERY);
+            }
+        }, 50);
+    };
+
     const updateImages = imageBatch => {
         const updated = _cloneDeep(GALLERY);
         updated.images = imageBatch;
-        set(updated);
+        set(updated); save();
     };
 
     const getAllImages = () => _cloneDeep(GALLERY.images);
 
+    const addImages = extraGallery => {
+        const updated = _cloneDeep(GALLERY);
+
+        for (const image of extraGallery.images) {
+            if (!updated.images.find(next => next.fileName === image.fileName)) {
+
+                image.id = image.fileName;
+                image.svgSequence = extraGallery.svgSequences[image.fileName];
+
+                updated.svgSequences[image.fileName] = extraGallery.svgSequences[image.fileName];
+
+                updated.images.push(image);
+            }
+        }
+
+        console.log('UPDATED ADD IMAGES', updated);
+        set(updated);
+    };
 
     const viewLightbox = fileName => {
         const updated = _cloneDeep(GALLERY);
@@ -36,7 +62,7 @@ const createGalleryStore = () => {
         image.description = htmlString;
         image.title = title || '';
 
-        set(updated);
+        set(updated); save();
     };
 
     const closeLightbox = () => {
@@ -56,8 +82,7 @@ const createGalleryStore = () => {
             ...GALLERY,
             ...updates
         };
-        set(updated);
-        console.log('STORE updateMeta', updated);
+        set(updated); save();
     };
 
     const hide = fileName => {
@@ -68,7 +93,7 @@ const createGalleryStore = () => {
         toHide.hidden = true;
         updated.images.push(toHide);
 
-        set(updated);
+        set(updated); save();
     };
 
     const unhide = fileName => {
@@ -79,7 +104,7 @@ const createGalleryStore = () => {
         toReveal.hidden = false;
         updated.images.unshift(toReveal);
 
-        set(updated);
+        set(updated); save();
     };
 
     return {
@@ -89,6 +114,8 @@ const createGalleryStore = () => {
         viewLightbox,
         closeLightbox,
         toggleControlPanel,
+
+        addImages,
 
         updateDescription,
         updateMeta,

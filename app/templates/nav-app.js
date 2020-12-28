@@ -5,15 +5,18 @@ const hydrateSharedData = navData => {
     const categories = [];
 
     for (const album of navData.albums) {
-        for (const cat of album.navCategories) {
-            if (!categories.includes(cat)) {
-                categories.push(cat);
+        if (Array.isArray(album.navCategories)) {
+            for (const cat of album.navCategories) {
+                if (!categories.includes(cat)) {
+                    categories.push(cat);
+                }
             }
         }
     }
 
     window.NAV_DATA = window.NAV_DATA || {};
     window.NAV_DATA.categories = categories;
+    window.NAV_DATA.NAV_ROOT = navData.navRoot || '../';
 
 };
 
@@ -24,10 +27,11 @@ const NavApp = navData => {
         return;
     }
 
+    console.log('navData!', navData);
+
     NavStore.set(navData);
     hydrateSharedData(navData);
 
-    console.log('navApp Started!');
     const urls = [];
     for (const next of navData.albums) {
         if (urls.includes(next.url)) {
@@ -36,14 +40,12 @@ const NavApp = navData => {
             urls.push(next.url);
         }
     }
-    console.log('navData', navData);
 
     // eslint-disable-next-line no-unused-vars
     const navApp = new Nav({
         target: document.getElementById('navApp'),
         props: {}
     });
-
 
 };
 

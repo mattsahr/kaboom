@@ -73,7 +73,7 @@ const rollupBasic = {
 const rollupNav = {
 	input: 'templates/nav-app.js',
 	output: { 
-		sourcemap: true, format: 'iife', name: 'basic',
+		sourcemap: true, format: 'iife', name: 'nav',
 		file: 'pages/nav-app.js'
 	},
 	plugins: [
@@ -84,20 +84,18 @@ const rollupNav = {
 		concatHTML({
 			replacements: {
 		        __app_file_name__: '__app/album-basic.js',
-		        __API_file_name__: '',
 		        __css_global_file_name__: '',
 		        __css_bundle_file_name__: '__app/bundle-basic.css',
-		        __css_nav_file_name__: 'bundle-nav.css',
+		        __css_nav_file_name__: '../bundle-nav.css',
 		        __html_bundle_output__: 'basic.html'
 			}
 		}),
 		concatHTML({
 			replacements: {
 		        __app_file_name__: '__app/album-app.js',
-		        __API_file_name__: '__app/network-api.js',
 		        __css_global_file_name__: '__app/global.css',
 		        __css_bundle_file_name__: '__app/bundle.css',
-		        __css_nav_file_name__: 'bundle-nav.css',
+		        __css_nav_file_name__: '../bundle-nav.css',
 		        __html_bundle_output__: 'index.html'
 			}
 		}),

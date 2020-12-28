@@ -2,6 +2,7 @@ const fs = require( 'fs' );
 const path = require( 'path' );
 const {
     ALBUM_META_JSON,
+    ALBUM_META_JSON_BACKUP,
     GALLERY_ACTIVE_PATH,
     GALLERY_STATIC_PATH
 } = require('../constants.js');
@@ -18,13 +19,24 @@ const saveMeta = async (navMeta, successCallback) => {
     await fs.promises.writeFile(filePath2, json);
 
     if (successCallback) {
+        console.log(' ');
+        console.log('Site Nav updated: ' + navMeta.albums.length + ' albums');
+        console.log(' ');
         successCallback();
     }
 };
 
 const addNavItem = async (directory, navMeta) => {
     const metaPath = path.join(directory,  ALBUM_META_JSON);
-    let meta = await fs.promises.readFile(metaPath, 'utf8');
+    let meta;
+
+    try {
+        meta = await fs.promises.readFile(metaPath, 'utf8');
+    } catch {
+        const backupPath = path.join(directory, ALBUM_META_JSON_BACKUP);
+        meta = await fs.promises.readFile(backupPath, 'utf8');
+    }
+
     meta = JSON.parse(meta);
 
     const next = {
@@ -33,11 +45,12 @@ const addNavItem = async (directory, navMeta) => {
         subtitle_B: meta.subtitle_B,
         date: meta.date,
         url: meta.url,
+        imageCount: meta.imageCount,
         navCategories: meta.navCategories,
         appActive: directory.includes(GALLERY_ACTIVE_PATH)
     };
 
-    console.log('collect nav: ' + directory);
+    // console.log('collect nav: ' + directory);
     navMeta.albums.push(next);
     return path;
 };

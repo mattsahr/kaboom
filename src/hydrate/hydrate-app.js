@@ -70,6 +70,12 @@ const hydrateAppFile = (fileName, albumsPath) => async successCallback => {
     writeToAlbums(albumsPath, filePath, file, successCallback);
 };
 
+const writeToRoot = (fileName, directory) => async successCallback => {
+    const sourcePath = path.join(APP_DIRECTORY, fileName);
+    const file = await fs.promises.readFile(sourcePath, 'utf8');
+    const writePath = path.join(directory, fileName);
+    fs.writeFile(writePath, file, successCallback);
+};
 
 
 const hydrateHTML = async (successCallback) => {
@@ -107,7 +113,12 @@ const appGlobalCSS =    hydrateAppFile('global.css', GALLERY_ACTIVE_PATH);
 
 const basic =           hydrateAppFile('album-basic.js', GALLERY_STATIC_PATH);
 const basicCSS =        hydrateAppFile('bundle-basic.css', GALLERY_STATIC_PATH);
-const basicGlobalCSS =  hydrateAppFile('global-basic.css', GALLERY_STATIC_PATH);
+
+const navActiveCSS =    writeToRoot('bundle-nav.css', GALLERY_ACTIVE_PATH);
+const navStaticCSS =    writeToRoot('bundle-nav.css', GALLERY_STATIC_PATH);
+const navActive =       writeToRoot('nav-app.js', GALLERY_ACTIVE_PATH);
+const navStatic =       writeToRoot('nav-app.js', GALLERY_STATIC_PATH);
+// const basicGlobalCSS =  hydrateAppFile('global-basic.css', GALLERY_STATIC_PATH);
 
 const hydrateApp = (() => {
 
@@ -123,10 +134,15 @@ const hydrateApp = (() => {
 
                 basic,
                 basicCSS,
-                basicGlobalCSS
+
+                navActive,
+                navStatic,
+                navActiveCSS,
+                navStaticCSS
+
             },
-            successCallback,
-            'REPORT'
+            successCallback
+            // 'REPORT'
         );
     };
 

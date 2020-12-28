@@ -24,6 +24,22 @@ const hydrateTitle = albmum => {
     }
 };
 
+const add11Plus = () => {
+    fetch('./album-11-plus.json')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("HTTP error " + response.status);
+            }
+        return response.json();
+    })
+    .then(json => {
+        GalleryStore.addImages(json);
+    })
+    .catch(err => {
+        console.log('fetch error', err);
+    });
+};
+
 const composeStartup = App => albumData => {
 
     if (!albumData) {
@@ -43,6 +59,7 @@ const composeStartup = App => albumData => {
         props: {}
     });
 
+    setTimeout(add11Plus, 500);
 };
 
 export default composeStartup;

@@ -1,12 +1,15 @@
 <script>
     export let item = {};
     export let custom = {};
+
+    const getRoot = () => (window.NAV_DATA && window.NAV_DATA.NAV_ROOT) || '../';
+
 </script>
 
 <!-- ====================================== HTML =============================================== -->
 
 <a class={'nav-item' + (custom.className ? ' ' + custom.className : '')}
-    href={custom.noLink ? '' : custom.url || item.url}
+    href={custom.noLink ? '' : custom.url || (getRoot() + item.url)}
     title={custom.title ? custom.title : '/' + item.url}>
 
     <div class="nav-title">{custom.title || item.title}</div>

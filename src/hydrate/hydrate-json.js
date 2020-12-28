@@ -9,16 +9,46 @@ const { checkFile, replaceLastOrAdd } = require('../helpers/helpers.js');
 
 const saveMeta = async (albumMeta, saveDirectory, successCallback) => {
 
-    const json = JSON.stringify(albumMeta);
-    const filePath = saveDirectory
-        ? path.join(saveDirectory, 'album-meta.json')
-        : 'album-meta.json';
-    
-    await fs.promises.writeFile(filePath, json);
+    const album1to10 = {
+        ...albumMeta,
+        imageCount: albumMeta.images.length,
+        images: [],
+        svgSequences: {}
+    }
 
+    const album11plus = {
+        ...albumMeta,
+        imageCount: albumMeta.images.length,
+        images: [],
+        svgSequences: {}
+    }
+
+    let count = 0;
+    for (const image of albumMeta.images) {
+        target = (count < 10) ? album1to10 : album11plus;
+        target.images.push(image);
+        target.svgSequences[image.fileName] = albumMeta.svgSequences[image.fileName];
+        count++;
+    }
+
+
+    const jsonA = JSON.stringify(album1to10);
+    const filePathA = saveDirectory
+        ? path.join(saveDirectory, 'album-1-to-10.json')
+        : 'album-meta.json';
+
+    const jsonB = JSON.stringify(album11plus);
+    const filePathB = saveDirectory
+        ? path.join(saveDirectory, 'album-11-plus.json')
+        : 'album-11-plus.json';
+    
+    await fs.promises.writeFile(filePathA, jsonA);
+    await fs.promises.writeFile(filePathB, jsonB);
 
     console.log(' ');
-    console.log('saved: ' + filePath);
+    console.log('saved: ' + filePathA);
+    console.log('saved: ' + filePathB);
+
     if (successCallback) {
         successCallback(saveDirectory);
     }
@@ -78,24 +108,70 @@ const hydrateJSON = async (albumDirectory, size, originals, successCallback) => 
         url: path.basename(albumDirectory) // albumDirectory.split('\\').pop()
     };
 
+
     const metaPath = path.join(albumDirectory, 'album-meta.json');
 
+    console.log('META PATH', metaPath);
+
     const gotAlbumMeta = checkFile(metaPath);
+
+    console.log('gotAlbumMeta', gotAlbumMeta);
 
     if (gotAlbumMeta) {
         albumMeta = await fs.promises.readFile(metaPath, 'utf8');
         albumMeta = JSON.parse(albumMeta);
         console.log('already got albumMeta!');
-        albumMeta.url = albumDirectory.split('/').pop();
+        albumMeta.url = path.basename(albumDirectory); // albumDirectory.split('/').pop();
 
         albumMeta.svgSequences = albumMeta.svgSequences || {};
+
+        // clean up old style embedded sequence
+        // TODO -- REMOVE THIS LOOP
         for (const image of albumMeta.images) {
             if (image.svgSequence) { 
                 albumMeta.svgSequences[image.fileName] = image.svgSequence;
                 delete image.svgSequence;
             }
         }
+
     } 
+
+    const meta10Path = path.join(albumDirectory, 'album-1-to-10.json');
+    const meta11Path = path.join(albumDirectory, 'album-11-plus.json');
+    
+    const gotAlbum10 = checkFile(meta10Path);
+    const gotAlbum11 = checkFile(meta11Path);
+
+    if (gotAlbum10) {
+        albumMeta = await fs.promises.readFile(meta10Path, 'utf8');
+        albumMeta = JSON.parse(albumMeta);
+        console.log('already got albumMeta!');
+        albumMeta.url = path.basename(albumDirectory); // albumDirectory.split('/').pop();
+
+        albumMeta.svgSequences = albumMeta.svgSequences || {};
+
+        // clean up old style embedded sequence
+        // TODO -- REMOVE THIS LOOP
+        for (const image of albumMeta.images) {
+            if (image.svgSequence) { 
+                albumMeta.svgSequences[image.fileName] = image.svgSequence;
+                delete image.svgSequence;
+            }
+        }
+
+    } 
+
+    if (gotAlbum11) {
+        const meta11 = await fs.promises.readFile(meta11Path, 'utf8');
+        const { images, svgSequences } = JSON.parse(meta11);
+        for (const image of images) {
+            if (!albumMeta.images.find(next => next.fileName === image.fileName)) {
+                delete image.svgSequence;
+                albumMeta.images.push(image);
+                albumMeta.svgSequences[image.fileName] = svgSequences[image.fileName];
+            }
+        }
+    }
 
     const imageDirectory = path.join(albumDirectory, size);
     const originalDirectory = path.join(albumDirectory, originals);

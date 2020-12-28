@@ -2,7 +2,6 @@
         "use strict";
 
         var APP_FILE_NAME = '__app_file_name__';
-        var NETWORK_API_FILE_NAME = '__API_file_name__';
 
         (function() {
             var composeStartCache = function(appName) {
@@ -61,19 +60,19 @@
 
             var loadData = function () {
 
-                makeRequest('GET', 'album-meta.json')
+                makeRequest('GET', 'album-1-to-10.json')
                     .then(function (data) {
                         var galleryData = JSON.parse(data);
                         kickstart('data')(galleryData);
                     })
                     .catch(function (err) {
-                        console.error('Load album-meta.json: there was an error!', err.statusText);
+                        console.error('Load 1-to-10.json: there was an error!', err.statusText);
                     });
 
             };
 
             var loadNavData = function () {
-                makeRequest('GET', '/nav-meta.json')
+                makeRequest('GET', '../nav-meta.json')
                     .then(function (data) {
                         var navData = JSON.parse(data);
                         navstart('data')(navData);
@@ -99,15 +98,7 @@
 
             var loadNav =function () {
                 loadNavData();
-
-                if (NETWORK_API_FILE_NAME) { 
-                    loadScript(NETWORK_API_FILE_NAME);
-                } else {
-                    console.log('NO NETWORK_API_FILE_NAME');
-                }
-
-                loadScript('/nav-app.js', navstart('app'));
-
+                loadScript('../nav-app.js', navstart('app'));
             }
 
             loadApp();

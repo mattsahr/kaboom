@@ -1,13 +1,11 @@
 const { helpFile, pp, shortHelp, unknownArg } = require('./help-file.js');
-const buildDirectories = require('./build-scripts/build-directories/build-directories.js');
-const processActiveImages = require('./build-scripts/ingest-resize/ingest-resize.js');
-const { toStatic, toActive } = require('./build-scripts/helpers/move-albums.js');
-
-const { next, waitSerial } = require ('./build-scripts/helpers/helpers.js');
-const buildNav = require('./build-scripts/build-nav/build-nav.js');
-const hydrateApp = require('./build-scripts/hydrate/hydrate-app.js');
-const hydrateNavJSON = require('./build-scripts/hydrate/hydrate-nav-json');
-const serve = require('./build-scripts/serve/serve.js');
+const buildDirectories = require('./build-directories/build-directories.js');
+const processActiveImages = require('./ingest-resize/ingest-resize.js');
+const { toStatic, toActive } = require('./helpers/move-albums.js');
+const hydrateJSON = require ('./hydrate/hydrate-json.js');
+const hydrateApp = require('./hydrate/hydrate-app.js');
+const hydrateNavJSON = require('./hydrate/hydrate-nav-json');
+const serve = require('./serve/serve.js');
 
 const test = () => { console.log( '-------- TEST CALLBACK >>> Finished! ---------'); };
 
@@ -35,7 +33,11 @@ const cli = (args) => {
             toActive(option);
             break;
         case 'test':
+            hydrateJSON('./gallery-active/india-mahabs', 'svg', '__original', test);
             // buildDirectories(test);
+            break;
+        case 'serve':
+            hydrateApp(() => { hydrateNavJSON(serve); });
             break;
         case 'ingest': {
             const next = () => { processActiveImages(option, test); };

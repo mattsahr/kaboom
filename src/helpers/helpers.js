@@ -4,12 +4,10 @@ const checkFile = path => {
     try {
         if (fs.existsSync(path)) {
             return true;
-            console.log("Directory exists.");
         } else {
             return false;
         }
     } catch(e) {
-        console.log("Directory check ERROR: " + path);
         return false;
     }
 };

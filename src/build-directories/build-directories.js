@@ -2,8 +2,6 @@ const fs = require( 'fs' );
 const path = require( 'path' );
 const { copyFile, waitParallel, waitSerial } = require('../helpers/helpers.js');
 const {
-    ALBUM_META_JSON,
-    APP_DIRECTORY,
     DEFAULT_IMAGE_DIRECTORY,
     DEMO_ALBUM,
     DEMO_PIX,
@@ -17,6 +15,10 @@ const buildDirectories = (() => {
     const buildActiveGallery = (successCallback) => {
         if (!fs.existsSync(GALLERY_ACTIVE_PATH)){
             fs.mkdirSync(GALLERY_ACTIVE_PATH);
+
+            const faviconPath = path.join(DUMMY_RESOURCE_PATH, 'favicon.png');
+            copyFile(faviconPath, GALLERY_ACTIVE_PATH);
+
             console.log('added directory: ' + GALLERY_ACTIVE_PATH);
         }
         if (successCallback) { successCallback(); }
@@ -25,6 +27,10 @@ const buildDirectories = (() => {
     const buildStaticGallery = (successCallback) => {
         if (!fs.existsSync(GALLERY_STATIC_PATH)){
             fs.mkdirSync(GALLERY_STATIC_PATH);
+
+            const faviconPath = path.join(DUMMY_RESOURCE_PATH, 'favicon.png');
+            copyFile(faviconPath, GALLERY_STATIC_PATH);
+
             console.log('added directory: ' + GALLERY_STATIC_PATH);
         }
         if (successCallback) { successCallback(); }

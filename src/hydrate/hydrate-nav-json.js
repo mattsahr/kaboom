@@ -65,7 +65,7 @@ const addDir = async (directory, name, navMeta) => {
     return false;
 };
 
-const hydrateNavJSON = async (successCallback) => {
+const hydrateNavJSON = successCallback => async () => {
 
     const navMeta = {
         albums: []

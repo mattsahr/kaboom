@@ -249,7 +249,7 @@ const processActiveImages = (() => {
 
     };
 
-    return async (albumArgument, successCallback) => {
+    return (albumArgument, successCallback) => async () => {
         const workingPath = GALLERY_ACTIVE_PATH;
         const gallery = await fs.promises.readdir(workingPath);
 

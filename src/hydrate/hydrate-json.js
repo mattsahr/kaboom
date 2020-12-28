@@ -11,6 +11,7 @@ const saveMeta = async (albumMeta, saveDirectory, successCallback) => {
 
     const album1to10 = {
         ...albumMeta,
+        section: '1-to-10',
         imageCount: albumMeta.images.length,
         images: [],
         svgSequences: {}
@@ -18,6 +19,7 @@ const saveMeta = async (albumMeta, saveDirectory, successCallback) => {
 
     const album11plus = {
         ...albumMeta,
+        section: '11-plus',
         imageCount: albumMeta.images.length,
         images: [],
         svgSequences: {}
@@ -95,7 +97,7 @@ const svgToData = data => {
 
         const nextData = JSON.parse('[' + prepped + ']');
         nextData[1] = Number(nextData[1]).toFixed(3);
-        sequence.push(nextData);
+        sequence.push(nextData.join(','));
     }
     return { height, width, sequence };
 };

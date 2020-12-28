@@ -6,7 +6,7 @@ const DONT_MOVE = {
     '__app': true
 };
 
-const move = (fromPath, toPath) => async album => {
+const move = (fromPath, toPath) => album => async () => {
 
     const sourceNames = await fs.promises.readdir(fromPath);
     const sourceAlbums = [];

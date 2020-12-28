@@ -1,5 +1,5 @@
 
-export const replaceLastOrAdd = (input, find, replaceWith) => {
+const replaceLastOrAdd = (input, find, replaceWith) => {
     if (!input || !find || !input.length || !find.length) {
         return input;
     }
@@ -14,8 +14,23 @@ export const replaceLastOrAdd = (input, find, replaceWith) => {
         input.substr(lastIndex + find.length);
 };
 
-export const sizeName = (size, name) => replaceLastOrAdd(name, '.jpg', '--' + size + '.jpg');
+const replaceExtension = (() => {
+
+    const extensions = ['.jpg', '.jpeg', '.gif', '.png'];
+
+    return (name, replacement) => {
+        for (const extension of extensions) {
+            if (name.endsWith(extension)) {
+                return replaceLastOrAdd(name, extension, replacement);
+            }
+        }
+        return name + '.ERROR-BAD-EXTENSION';
+    };
+
+})(); 
+
+export const sizeName = (size, name) => replaceExtension(name, '--' + size + '.jpg');
 
 export const getSizedPath = (size, fileName) => size === 'original' 
     ? '__original/' + fileName
-    : size + '/' + replaceLastOrAdd(fileName, '.jpg', '--' + size + '.jpg');
+    : size + '/' + replaceExtension(fileName, '--' + size + '.jpg');

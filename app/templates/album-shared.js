@@ -24,6 +24,15 @@ const hydrateTitle = albmum => {
     }
 };
 
+const hydrateSvgSequences = (() => {
+    const explode = str => str.split(',');
+    return albumData => {
+        for (const [fileName, seq] of Object.entries(albumData.svgSequences)) {
+            albumData.svgSequences[fileName] = seq.map(explode);
+        }
+    };
+})(); 
+
 const add11Plus = () => {
     fetch('./album-11-plus.json')
         .then(response => {
@@ -33,6 +42,7 @@ const add11Plus = () => {
         return response.json();
     })
     .then(json => {
+        hydrateSvgSequences(json);
         GalleryStore.addImages(json);
     })
     .catch(err => {
@@ -48,6 +58,7 @@ const composeStartup = App => albumData => {
     }
 
     hydrateTitle(albumData);
+    hydrateSvgSequences(albumData);
     hydrateAlbum(albumData);
     hydrateNavData(albumData);
 

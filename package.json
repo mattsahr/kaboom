@@ -1,7 +1,7 @@
 {
   "name": "@mattsahr/kaboom",
   "version": "0.1.0",
-  "description": "Kaboom image gallery",
+  "description": "A static site photo gallery, focused on tiny/fast loading and a linear narrative display.",
   "main": "src/index.js",
   "bin": {
     "@mattsahr/kaboom": "bin/kaboom.js",

@@ -1,0 +1,5 @@
+
+export const HOME_DIRECTORY = '__HOME__';
+export const HOME_PAGE_CATEGORY = 'NO_CATEGORY_FRONT_PAGE';
+export const ORPHAN_CATEGORY = '__ORPHAN_EMPTY_CATEGORY__';
+export const ORPHAN_CATEGORY_LABEL = 'Other';

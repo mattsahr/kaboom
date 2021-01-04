@@ -33,7 +33,7 @@ function serve() {
 const rollupApp = {
 	input: 'templates/album.js',
 	output: {
-		sourcemap: true, format: 'iife', name: 'app',
+		sourcemap: !production, format: 'iife', name: 'app',
 		file: 'pages/__app/album-app.js'
 	},
 	plugins: [
@@ -53,7 +53,7 @@ const rollupApp = {
 const rollupBasic = {
 	input: 'templates/album-basic.js',
 	output: { 
-		sourcemap: true, format: 'iife', name: 'basic',
+		sourcemap: !production, format: 'iife', name: 'basic',
 		file: 'pages/__app/album-basic.js'
 	},
 	plugins: [
@@ -73,7 +73,7 @@ const rollupBasic = {
 const rollupNav = {
 	input: 'templates/nav-app.js',
 	output: { 
-		sourcemap: true, format: 'iife', name: 'nav',
+		sourcemap: !production, format: 'iife', name: 'nav',
 		file: 'pages/nav-app.js'
 	},
 	plugins: [

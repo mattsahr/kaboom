@@ -29,7 +29,8 @@
         ['large', '1700w']
     ];
 
-    const getSrcSizes = fileName => ([size, width]) => getSizedPath(size, fileName) + ' ' + width;
+    const getSrcSizes = (fileName, url) => ([size, width]) => 
+        getSizedPath(size, fileName, url) + ' ' + width;
 
     const closeMe = () => { 
         slideDirection = '';
@@ -105,6 +106,7 @@
     $: imgData = $GalleryStore.images[currentIndex];
     $: data = imgData || dummyImage;
     $: fileName = data.fileName;
+    $: sourceURL = data.url;
     $: width = data.width;
     $: height = data.height;
     $: ratio = height / width;
@@ -112,12 +114,12 @@
     $: workingWidth = calcWidth(data);
     $: photoClass = 'photo ' + (ratio > 1 ? 'tall' : ratio < 1 ? 'wide' : 'square');
     $: alt = data.title || 'image';
-    $: src = active ? getSizedPath('small', fileName) : '';
+    $: src = active ? getSizedPath('small', fileName, sourceURL) : '';
     $: srcset = !active 
         ? ''
         : Boolean(zoomer)
-            ? getSizedPath('large', fileName) + ' 300w'
-            : srcSizes.map(getSrcSizes(fileName)).join(',');
+            ? getSizedPath('large', fileName, sourceURL) + ' 300w'
+            : srcSizes.map(getSrcSizes(fileName, sourceURL)).join(',');
     $: svgSequence = data.svgSequence;
     $: svgHeight = data.svgHeight;
     $: svgWidth = data.svgWidth;

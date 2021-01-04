@@ -1,15 +1,17 @@
-const fs = require( 'fs' );
+const fs = require('fs-extra');
 const path = require( 'path' );
 const { copyFile, replaceLastOrAdd } = require('../helpers/helpers.js');
 const nConvert = require('./n-convert.js');
 const primitive = require('./primitive.js');
 const hydrateJSON = require('../hydrate/hydrate-json.js');
-const hydrateNavJSON = require('../hydrate/hydrate-nav-json.js');
 
 const {
+    APP_LOCAL_DIRECTORY,
     DEFAULT_IMAGE_DIRECTORY,
     GALLERY_ACTIVE_PATH
 } = require('../constants.js');
+
+const notAppDir = dir => dir !== APP_LOCAL_DIRECTORY;
 
 const TRANSFORM_SIZES = {
     // microscopic: 'microscopic',
@@ -190,6 +192,50 @@ const albumTransform = async (albumPath, successCallback) => {
 
 const processActiveImages = (() => {
 
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+    const suffixes = letters.concat(
+            letters.map(a => a + a),
+            letters.map(a => a + a + a),
+            letters.map(a => a + a + a + a)
+    );
+
+    const renameDupes = async (fileNames, directory) => {
+
+        const names = fileNames.map(next => [path.parse(next).name, path.parse(next).ext]);
+        const unique = {};
+        const dupes = [];
+
+        for (const [name, ext] of names) {
+            if (!unique[name]) {
+                unique[name] = true;
+            } else {
+                dupes.push([name, ext]);
+            }
+        }
+
+        if (dupes.length) {
+
+            for (const [dupe, ext] of dupes) {
+
+                for (const suffix of suffixes) {
+                    const replacement = dupe + '-' + suffix;
+
+                    if (!unique[replacement]) {
+                        unique[replacement] = true;
+
+                        await fs.promises.rename(
+                            path.join(directory, dupe + ext), 
+                            path.join(directory, replacement + ext)
+                        );
+
+                        break;
+                    }
+                }
+            }
+
+        }
+    };
+
     const surveyAlbum = async (albumPath, successCallback, finalCallback) => {
 
         const topItems = await fs.promises.readdir(albumPath);
@@ -206,20 +252,16 @@ const processActiveImages = (() => {
             return;
         }
 
+        await renameDupes(originals, originalPath);
+
         for (const size of Object.values(TRANSFORM_SIZES)) {
+            const sizePath = path.join(albumPath, size);
             if (!topItems.includes(size)) {
-                const sizePath = path.join(albumPath, size);
                 fs.mkdirSync(sizePath);
+            } else {
+                fs.emptyDirSync(sizePath);
             }
         }
-
-        const fullItems = await fs.promises.readdir(albumPath);
-        console.log(albumPath, '---- all directories ----');
-        for (const item of fullItems) {
-            console.log('    ' + item);
-        }
-        console.log('---- ---- ----');
-        console.log('  ');
 
         if (successCallback) { 
             successCallback(albumPath, finalCallback);
@@ -254,7 +296,7 @@ const processActiveImages = (() => {
         const gallery = await fs.promises.readdir(workingPath);
 
         const albums = [];
-        for (const item of gallery) {
+        for (const item of gallery.filter(notAppDir)) {
             if (albumArgument && item !== albumArgument) {
                 continue;
             }

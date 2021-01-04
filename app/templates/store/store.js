@@ -18,6 +18,10 @@ const createGalleryStore = () => {
         }, 50);
     };
 
+    const stampTime = obj => {
+        obj.lastUpdate = Date.now();
+    };
+
     const updateImages = imageBatch => {
         const updated = _cloneDeep(GALLERY);
         updated.images = imageBatch;
@@ -26,6 +30,12 @@ const createGalleryStore = () => {
 
     const getAllImages = () => _cloneDeep(GALLERY.images);
 
+    const hydrateSvgSequence = (() => {
+        const dummySequence = ['#ef5c08,0.945,133,110,220,161'];
+        const explode = str => str.split(',');
+        return seq => (seq || dummySequence).map(explode);
+    })(); 
+
     const addImages = extraGallery => {
         const updated = _cloneDeep(GALLERY);
 
@@ -33,7 +43,7 @@ const createGalleryStore = () => {
             if (!updated.images.find(next => next.fileName === image.fileName)) {
 
                 image.id = image.fileName;
-                image.svgSequence = extraGallery.svgSequences[image.fileName];
+                image.svgSequence = hydrateSvgSequence(extraGallery.svgSequences[image.fileName]);
 
                 updated.svgSequences[image.fileName] = extraGallery.svgSequences[image.fileName];
 
@@ -61,7 +71,49 @@ const createGalleryStore = () => {
 
         image.description = htmlString;
         image.title = title || '';
+        stampTime(image);
+        stampTime(updated);
 
+        set(updated); save();
+    };
+
+    const updatePromoDescription = (fileName, title, htmlString) => {
+        const updated = _cloneDeep(GALLERY);
+        const image = updated.images.find(next => next.fileName === fileName);
+
+        image.promoDescription = htmlString;
+        image.title = title || '';
+        updated.promo.promoDescription = image.promoDescription;
+        updated.promo.title = image.title;
+
+        stampTime(image);
+        stampTime(updated.promo);
+        stampTime(updated);
+
+        set(updated); save();
+    };
+
+    const setPromo = fileName => {
+        const updated = _cloneDeep(GALLERY);
+        for (const item of updated.images) {
+            if (item.fileName === fileName) {
+
+                stampTime(item);
+
+                if (item.isPromo) {
+                    delete item.isPromo;
+                    delete updated.promo;
+                } else {
+                    item.isPromo = true;
+                    updated.promo = _cloneDeep(item);
+                    stampTime(updated.promo);
+                }
+            } else {
+                delete item.isPromo;
+            }
+        }
+
+        stampTime(updated);
         set(updated); save();
     };
 
@@ -82,6 +134,7 @@ const createGalleryStore = () => {
             ...GALLERY,
             ...updates
         };
+        stampTime(updated);
         set(updated); save();
     };
 
@@ -93,6 +146,8 @@ const createGalleryStore = () => {
         toHide.hidden = true;
         updated.images.push(toHide);
 
+        stampTime(toHide);
+        stampTime(updated);
         set(updated); save();
     };
 
@@ -104,6 +159,8 @@ const createGalleryStore = () => {
         toReveal.hidden = false;
         updated.images.unshift(toReveal);
 
+        stampTime(toReveal);
+        stampTime(updated);
         set(updated); save();
     };
 
@@ -118,7 +175,9 @@ const createGalleryStore = () => {
         addImages,
 
         updateDescription,
+        updatePromoDescription,
         updateMeta,
+        setPromo,
 
         hide,
         unhide,

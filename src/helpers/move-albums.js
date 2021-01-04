@@ -1,16 +1,22 @@
 const fs = require( 'fs' );
 const path = require( 'path' );
-const { GALLERY_ACTIVE_PATH, GALLERY_STATIC_PATH } = require('../constants.js');
+const { 
+    APP_LOCAL_DIRECTORY,
+    GALLERY_ACTIVE_PATH, 
+    GALLERY_STATIC_PATH 
+} = require('../constants.js');
 
 const DONT_MOVE = {
     '__app': true
 };
 
+const notAppDir = dir => dir !== APP_LOCAL_DIRECTORY;
+
 const move = (fromPath, toPath) => album => async () => {
 
     const sourceNames = await fs.promises.readdir(fromPath);
     const sourceAlbums = [];
-    for (const name of sourceNames) {
+    for (const name of sourceNames.filter(notAppDir)) {
         if (DONT_MOVE[name]) {
             continue;
         }

@@ -101,7 +101,7 @@ Type this command to add a demo album:
 kaboom init
 ```
 
-After running "kaboom init", take a look at your /kaboom/ directory, you should see these directories (among others).
+After running "kaboom init", The root /kaboom/ directory should now contain a "gallery-active" directory and a "gallery-static" directory (among others).
 
 ```
 kaboom
@@ -117,7 +117,7 @@ kaboom
     -- favicon.png
 ```
 
-Inside the "demo-album", the "__original" directory is where you put your original images.  To process these images and prep them for the server, run the "kaboom ingest" command.  
+Inside "demo-album", there is an "__original" directory.  That is where you put your original images.  To process these images and prep them for the server, run the "kaboom ingest" command.  
 **NOTE** -- you must have **nconvert** and **primitive** installed for this step.
 
 ```
@@ -130,7 +130,7 @@ The ingest command makes various sizes of the source images, as well as a placeh
 kaboom serve
 ```
 
-In a web browser, browse to http://localhost:2317
+In a web browser, browse to [http://localhost:2317](http://localhost:2317)
 
 At this point, on the web page, you should be able to click in the "Description" area of any image, and add text.  There will also be two icons at the top right of the page -- "metadata" and "arrange" buttons.
 

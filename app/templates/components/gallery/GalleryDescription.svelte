@@ -1,10 +1,8 @@
 <script>
-    import { onMount } from 'svelte';
     import Editor from 'cl-editor';
-    // import Editor from 'cl-editor/src/Editor.svelte';
-
 
     export let updateDescription = () => false;
+    export let isPromo = false;
     export let imgData = {};
 
     let active = false;
@@ -16,12 +14,17 @@
         updateDescription(imgData.fileName, imgData.title, htmlString);
     };
 
-    const updateTitle = title => {
-        updateDescription(imgData.fileName, title, imgData.description);
-    };
+    $: descHtml = isPromo
+        ? imgData.promoDescription || imgData.description || '<em>Click to edit...</em>'
+        : imgData.description || '<em>Click to edit...</em>';
 
-    $: descHtml = imgData.description || '<em>Click to edit...</em>';
-    $: blockClass = 'description-block' + (active ? ' active' : '');
+    $: desc = isPromo
+        ? imgData.promoDescription || imgData.description
+        : imgData.description;
+
+    $: blockClass = 'description-block' + 
+        (active ? ' active' : '') +
+        (isPromo ? ' promo' : '');
 
     const activate = () => { 
         active = true; 
@@ -32,44 +35,6 @@
         active = false;   
     };
 
-    /*
-    function onTargetClick(e) {
-        const html = editTarget.innerHTML;
-
-        console.log('editTarget', editTarget);
-        console.log('html', html);
-
-        editTarget.innerHTML = '';
-        inlineEditor = new Editor({
-            target: editTarget,
-            props: {
-                actions: ['viewHtml', 'b', 'i', 'u', 'removeFormat', 'a'],
-                height: 'auto',
-                html: html
-            }
-        });
-
-        setActive();
-    }
-
-    function setActive() {
-        editTarget.removeEventListener('click', onTargetClick);
-
-        inlineEditor.on('blur', () => {
-            const html = inlineEditor.getHtml();
-            inlineEditor.destroy();
-            editTarget.innerHTML = html;
-            updateDesc(html);
-            editTarget.addEventListener('click', onTargetClick);
-        });
-    }
-
-    const clickListen = () => {
-        editTarget.addEventListener('click', onTargetClick);
-    };
-
-    onMount(clickListen);
-    */
 
 </script>
 
@@ -83,7 +48,7 @@
                 height="100%"
                 bind:this={editor} 
                 on:blur={deactivate} 
-                html={imgData.description} />
+                html={desc} />
         </div>
     {:else}
         <div class="description" on:click={activate}>{@html descHtml}</div>
@@ -103,6 +68,20 @@
         width: 280px;
         flex: 1 1 auto;
         z-index: 20;
+    }
+
+
+    .description-block.promo {
+        width: 100%;
+        padding: 0 0 16px 16px;
+        margin-top: -36px;
+        height: calc(100% - 54px);
+     }
+
+     .description-block.promo .description {
+        overflow-y: auto;
+        max-height: 100%;
+        padding-right: 16px;
     }
 
     .editor-wrapper {

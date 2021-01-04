@@ -2,6 +2,7 @@ const fs = require( 'fs' );
 const path = require( 'path' );
 const { copyFile, waitParallel, waitSerial } = require('../helpers/helpers.js');
 const {
+    APP_LOCAL_DIRECTORY,
     DEFAULT_IMAGE_DIRECTORY,
     DEMO_ALBUM,
     DEMO_PIX,
@@ -9,6 +10,8 @@ const {
     GALLERY_STATIC_PATH,
     DUMMY_RESOURCE_PATH
 } = require('../constants.js');
+
+const notAppDir = dir => dir !== APP_LOCAL_DIRECTORY;
 
 const buildDirectories = (() => {
 
@@ -39,7 +42,7 @@ const buildDirectories = (() => {
     const populateActiveGallery = async (successCallback) => {
         const galleryStaticNames = await fs.promises.readdir(GALLERY_STATIC_PATH);
         const staticAlbums = [];
-        for (const name of galleryStaticNames) {
+        for (const name of galleryStaticNames.filter(notAppDir)) {
             const albumPath = path.join(GALLERY_STATIC_PATH, name);
             const stat = await fs.promises.stat(albumPath);
             if (stat.isDirectory()) { staticAlbums.push(albumPath); }
@@ -50,7 +53,7 @@ const buildDirectories = (() => {
 
         const galleryActiveNames = await fs.promises.readdir(GALLERY_ACTIVE_PATH);
         const activeAlbums = [];
-        for (const name of galleryActiveNames) {
+        for (const name of galleryActiveNames.filter(notAppDir)) {
             const albumPath = path.join(GALLERY_ACTIVE_PATH, name);
             const stat = await fs.promises.stat(albumPath);
             if (stat.isDirectory()) { activeAlbums.push(albumPath); }

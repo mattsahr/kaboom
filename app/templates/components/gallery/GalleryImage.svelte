@@ -8,14 +8,23 @@
         viewLightbox(fileName);
     };
 
+    const DEFAULT_SVG_HEIGHT = 170;
+    const DEFAULT_SVG_WIDTH = 256;
+
     const srcSizes = [
         ['tiny', '400w'],
         ['small', '600w'],
         ['medium', '1180w']
         // ['large', '1700w']
     ];
-    const getSrcSizes = fileName => ([size, width]) => getSizedPath(size, fileName) + ' ' + width;
+
+    const getSrcSizes = (fileName, url) => ([size, width]) => 
+        getSizedPath(size, fileName, url) + ' ' + width;
+
     const getPadding = (width, height) => {
+        if (!height && !width) {
+            return '50%';
+        }
         if (height > width) { return '100%'; }
         return (100 * height / width).toFixed(2) + '%';
     };
@@ -36,13 +45,14 @@
     $: fileName = data.fileName;
     $: width = data.width;
     $: height = data.height;
-    $: src = show ? getSizedPath('small', fileName) : '';
-    $: srcset = show ? srcSizes.map(getSrcSizes(fileName)).join(',') : '';
+    $: sourceURL = data.url;
+    $: src = show ? getSizedPath('small', fileName, sourceURL) : '';
+    $: srcset = show ? srcSizes.map(getSrcSizes(fileName, sourceURL)).join(',') : '';
     $: spacerStyle = 'padding: 0 0 ' + getPadding(width, height) + ' 0';
     $: alt = data.title ? data.title : 'image';
     $: svgSequence = data.svgSequence;
-    $: svgHeight = data.svgHeight;
-    $: svgWidth = data.svgWidth;
+    $: svgHeight = data.svgHeight || DEFAULT_SVG_HEIGHT;
+    $: svgWidth = data.svgWidth || DEFAULT_SVG_WIDTH;
     $: photoSvgClass = 'photo-svg' + (loaded ? ' image-loaded': '');
     $: svgScale = Number(svgWidth) === 256 
         ? '' 

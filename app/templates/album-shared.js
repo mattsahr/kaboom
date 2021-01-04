@@ -5,11 +5,17 @@ const hydrateNavData = galleryData => {
     window.NAV_DATA.currentURL = galleryData.url;
 };
 
+const hydrateSvgSequence = (() => {
+    const dummySequence = ['#ef5c08,0.945,133,110,220,161'];
+    const explode = str => str.split(',');
+    return seq => (seq || dummySequence).map(explode);
+})(); 
+
 const hydrateAlbum = album => {
     const { images, svgSequences } = album;
     for (const image of images) {
         image.id = image.fileName;
-        image.svgSequence = svgSequences[image.fileName];
+        image.svgSequence = hydrateSvgSequence(svgSequences[image.fileName]);
     }
 };
 
@@ -24,14 +30,6 @@ const hydrateTitle = albmum => {
     }
 };
 
-const hydrateSvgSequences = (() => {
-    const explode = str => str.split(',');
-    return albumData => {
-        for (const [fileName, seq] of Object.entries(albumData.svgSequences)) {
-            albumData.svgSequences[fileName] = seq.map(explode);
-        }
-    };
-})(); 
 
 const add11Plus = () => {
     fetch('./album-11-plus.json')
@@ -42,7 +40,6 @@ const add11Plus = () => {
         return response.json();
     })
     .then(json => {
-        hydrateSvgSequences(json);
         GalleryStore.addImages(json);
     })
     .catch(err => {
@@ -57,8 +54,11 @@ const composeStartup = App => albumData => {
         return;
     }
 
+    console.group('composeStartup');
+    console.log('albumData', albumData);
+    console.groupEnd();
+
     hydrateTitle(albumData);
-    hydrateSvgSequences(albumData);
     hydrateAlbum(albumData);
     hydrateNavData(albumData);
 

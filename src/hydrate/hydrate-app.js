@@ -4,16 +4,25 @@ const { minify } = require('html-minifier');
 const { checkFile, waitSerial } = require('../helpers/helpers.js');
 const { 
     APP_DIRECTORY,
+    APP_LOCAL_DIRECTORY,
     GALLERY_ACTIVE_PATH,
     GALLERY_STATIC_PATH
 } = require('../constants.js');
 
+const requiredDirectories = [ '__app' ];
+
+// const writeToRoot = async (albumRoot, fileName, file, successCallback) => {
+
+//     const writePath = path.join(album, fileName);
+//     fs.writeFile(writePath, file, writeCallback);
+// };
+
+const notAppDir = dir => dir !== APP_LOCAL_DIRECTORY;
+
 const writeToAlbums = async (albumRoot, fileName, file, successCallback) => {
 
-    const requiredDirectories = [ '__app' ];
-
     if (!checkFile(albumRoot)) {
-        console.log('------- WRITE ' + fileName + '  -- NO ALBUMS FOUND: ' + albumRoot + ' -----');
+        console.log('------- WRITE ' + fileName + '  -- NO GALLERY ROOT: ' + albumRoot + ' -----');
         successCallback();
         return;
     }
@@ -21,7 +30,7 @@ const writeToAlbums = async (albumRoot, fileName, file, successCallback) => {
     const galleryNames = await fs.promises.readdir(albumRoot);
     const albums = [];
 
-    for (const name of galleryNames) {
+    for (const name of galleryNames.filter(notAppDir)) {
         const albumPath = path.join(albumRoot, name);
         const stat = await fs.promises.stat(albumPath);
         if (stat.isDirectory()) { albums.push(albumPath); }
@@ -42,23 +51,28 @@ const writeToAlbums = async (albumRoot, fileName, file, successCallback) => {
         }
     }
 
-    let writeCount = 0;
+    const localSuccessCallback = () => {
+        let writeCount = 0;
 
-    const writeCallback = err => {
-        if (err) {
-            console.log('write error', err);
-        } else {
-            writeCount++;
-            if (successCallback && (writeCount >= albums.length)) {
-                successCallback();
+        const writeCallback = err => {
+            if (err) {
+                console.log('write error', err);
+            } else {
+                writeCount++;
+                if (successCallback && (writeCount >= albums.length)) {
+                    successCallback();
+                }
             }
+        };
+
+        for (const album of albums) {
+            const writePath = path.join(album, fileName);
+            fs.writeFile(writePath, file, writeCallback);
         }
     };
 
-    for (const album of albums) {
-        const writePath = path.join(album, fileName);
-        fs.writeFile(writePath, file, writeCallback);
-    }
+    writeToRoot(fileName, albumRoot)(localSuccessCallback);
+
 };
 
 const hydrateAppFile = (fileName, albumsPath) => async successCallback => {
@@ -71,6 +85,19 @@ const hydrateAppFile = (fileName, albumsPath) => async successCallback => {
 };
 
 const writeToRoot = (fileName, directory) => async successCallback => {
+    if (!checkFile(directory)) {
+        console.log('------- WRITE ' + fileName + '  -- NO GALLERY ROOT: ' + directory + ' -----');
+        successCallback();
+        return;
+    }
+
+    for (const required of requiredDirectories) {
+        const directoryPath = path.join(directory, required);
+        if (!checkFile(directoryPath)) {
+            fs.mkdirSync(directoryPath);
+        }
+    }
+
     const sourcePath = path.join(APP_DIRECTORY, fileName);
     const file = await fs.promises.readFile(sourcePath, 'utf8');
     const writePath = path.join(directory, fileName);

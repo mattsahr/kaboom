@@ -1,7 +1,9 @@
-const HOME_DIRECTORY = '__HOME__';
-const HOME_PAGE_CATEGORY = 'NO_CATEGORY_FRONT_PAGE';
-
-
+import {
+    HOME_DIRECTORY,
+    HOME_PAGE_CATEGORY,
+    ORPHAN_CATEGORY,
+    ORPHAN_CATEGORY_LABEL
+} from './nav-constants';
 
 export const sortMethods = (() => {
     const fullT= item => (item.title || '' ) + 
@@ -31,8 +33,14 @@ export const getList = (albums, direction, activeSort, current) => {
 
 export const composeNavGroups = (list, categories) => categories
     .filter(cat => cat !== HOME_PAGE_CATEGORY)
-    .map(cat => ({
-        category: cat,
-        items: list.filter(next => next.navCategories && next.navCategories.includes(cat))
-    }))
+    .map(cat => cat === ORPHAN_CATEGORY
+        ? ({
+            category: ORPHAN_CATEGORY_LABEL,
+            items: list.filter(next => !next.navCategories || !next.navCategories.length)
+          })
+        : ({
+            category: cat,
+            items: list.filter(next => next.navCategories && next.navCategories.includes(cat))
+          })
+    )
     .filter(group => (group.items && group.items.length));

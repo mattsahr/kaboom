@@ -1,6 +1,7 @@
 <script>
     import { onMount } from 'svelte';
     import { writable } from "svelte/store";
+    import { ORPHAN_CATEGORY } from './components/nav/nav-constants';
     import NavStore from './store/nav-store';
     import NavGroups from './components/nav/NavGroups.svelte';
     import NavList from './components/nav/NavList.svelte';
@@ -67,11 +68,18 @@
 
     const initOptions = () => {
         current = window.NAV_DATA.currentURL;
+
         categories = [ ...window.NAV_DATA.categories].sort();
+        const orphans = $NavStore.albums
+            .filter(next => !next.navCategories || next.navCategories.length === 0);
+        if (orphans.length) {
+            categories.push(ORPHAN_CATEGORY);
+        }
 
         activeSort.set(sortMethods[$NavStore.sortMethod] || sortMethods.date); 
         orderType.set($NavStore.orderType || 'group');
         sortDirection.set($NavStore.sortDirection || 'ascending');
+
     };
 
     const initNavButton = () => {

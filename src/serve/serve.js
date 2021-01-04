@@ -28,7 +28,7 @@ const serve = () => {
     app.use(express.static('gallery-active'));
 
     app.listen(port, () => {
-      console.log(`Example app listening at http://localhost:${port}`);
+      console.log(`Kaboom app listening at http://localhost:${port}`);
     });
 
 };

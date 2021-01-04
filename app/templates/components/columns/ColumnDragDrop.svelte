@@ -1,5 +1,6 @@
 <script>
     import { onMount } from 'svelte';
+    import { fade } from "svelte/transition";
     import { flip } from "svelte/animate";
     import { dndzone } from "svelte-dnd-action";
     import GalleryStore from '../../store/store';
@@ -53,11 +54,13 @@
         GalleryStore.hide(fileName);
     };
 
+    /*
     function handleDndConsider(cId, e) {
         const index = imageBatches.findIndex(c => c.columnId === cId);
         imageBatches[index].items = e.detail.items;
         imageBatches = [...imageBatches];        
     }
+    */
 
     function handleDndFinalize(cId, e) {
         const index = imageBatches.findIndex(c => c.columnId === cId);
@@ -100,7 +103,7 @@
 <div class="arrange-toggle" on:click={handleToggle}><MdShuffle /></div>
 
 {#if gotHidden}
-    <div class={hiddenPixClass} fade:in on:click={toggleHiddenManager}>
+    <div class={hiddenPixClass} in:fade on:click={toggleHiddenManager}>
         Hidden Pix
         <MdClose />
     </div>
@@ -115,13 +118,15 @@
         {#if column.items && column.items.length}
             <div class="gallery-list" 
                 use:dndzone={{items: column.items, flipDurationMs, dragDisabled: mode !== 'arrange'}}
-                on:consider={(e) => handleDndConsider(column.columnId, e)} 
+                on:consider={(e) => handleDndFinalize(column.columnId, e)} 
                 on:finalize={(e) => handleDndFinalize(column.columnId, e)}>
 
                 {#each column.items as imgData(imgData.fileName)}
                     <div class="drag-animator"  animate:flip="{{duration: flipDurationMs}}">
                         <GalleryItem {imgData} {mode} {hideItem} unhideItem={false}
+                            setPromo={GalleryStore.setPromo}
                             updateDescription={GalleryStore.updateDescription}
+                            updatePromoDescription={GalleryStore.updatePromoDescription}
                             viewLightbox={GalleryStore.viewLightbox}  />
                     </div>
                 {/each}

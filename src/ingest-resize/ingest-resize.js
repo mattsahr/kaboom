@@ -1,4 +1,4 @@
-const fs = require('fs-extra');
+const fs = require('fs');
 const path = require( 'path' );
 const { copyFile, replaceLastOrAdd } = require('../helpers/helpers.js');
 const nConvert = require('./n-convert.js');
@@ -236,6 +236,16 @@ const processActiveImages = (() => {
         }
     };
 
+    const clearDirectory = async pathName => {
+        const files = await fs.promises.readdir(pathName);
+
+        for (const file of files) {
+            await fs.promises.unlink(path.join(pathName, file));
+        }
+
+        return true;
+    };
+
     const surveyAlbum = async (albumPath, successCallback, finalCallback) => {
 
         const topItems = await fs.promises.readdir(albumPath);
@@ -259,7 +269,7 @@ const processActiveImages = (() => {
             if (!topItems.includes(size)) {
                 fs.mkdirSync(sizePath);
             } else {
-                fs.emptyDirSync(sizePath);
+                await clearDirectory(sizePath);
             }
         }
 
@@ -279,7 +289,7 @@ const processActiveImages = (() => {
             if (finished.length >= allAlbums.length) {
                 console.log(' ');
                 // hydrateNavJSON();
-                successCallback();
+                if (successCallback) { successCallback(); }
             }
         };
 
@@ -319,15 +329,33 @@ const processActiveImages = (() => {
             return;
         }
 
-        const conversionSuccess = buildAlbumConversionSuccess(albums, successCallback);
 
-        for (const item of gallery) {
+        const albumPaths = [];
+
+        for (const item of gallery.filter(notAppDir)) {
             const albumPath = path.join(workingPath, item);
             const stat = await fs.promises.stat(albumPath);
             if (stat.isDirectory()) {
-                surveyAlbum(albumPath, albumTransform, conversionSuccess);
+                albumPaths.push(albumPath);
             }
         }
+
+        const proceed = () => {
+            if (albumPaths.length) {
+                const albumPath = albumPaths.shift();
+                surveyAlbum(albumPath, albumTransform, conversionSuccess);
+            } else if (successCallback) { 
+                successCallback(); 
+            }
+        };
+
+        const conversionSuccess = buildAlbumConversionSuccess(albumPaths, proceed);
+
+        // for (const albumPath of albumPaths)
+        //     surveyAlbum(albumPath, albumTransform, conversionSuccess);
+        // }
+
+        proceed();
 
     };
 

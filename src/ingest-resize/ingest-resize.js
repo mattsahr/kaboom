@@ -325,7 +325,7 @@ const processActiveImages = (() => {
                 console.log('No albums to process in /gallery-active');    
             }
             console.log(' ');
-            successCallback();
+            if (successCallback) { successCallback(); }
             return;
         }
 

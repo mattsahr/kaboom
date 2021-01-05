@@ -63,7 +63,7 @@ const cli = (args) => {
             break;
 
         case 'test':
-            hydrateJSON('./gallery-active/india-mahabs', 'svg', '__original', test);
+            hydrateJSON('./gallery-active/africa-ethiopia', test);
             break;
 
         default: 

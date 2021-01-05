@@ -45,20 +45,17 @@ const removeOrphanJSON = (albumMeta, originals) => {
     albumMeta.images = albumMeta.images.filter(imageFound(originals));
 };
 
+const hydrateJSON = async (albumDirectory, successCallback) => {
 
-const hydrateJSON = async (albumDirectory, size, originals, successCallback) => {
+    const albumMeta = await getMeta(albumDirectory);
 
-    const albumMeta = getMeta(albumDirectory);
-
-    const imageDirectory = path.join(albumDirectory, size);
-    const originalDirectory = path.join(albumDirectory, originals);
+    const imageDirectory = path.join(albumDirectory, 'svg');
+    const originalDirectory = path.join(albumDirectory, '__original');
     const imageNames = await fs.promises.readdir(imageDirectory);
     const total = imageNames.length;
     let count = 0;
 
     const confirmedOriginals = [];
-
-
 
     for (const fileName of imageNames) {
         // Get the full paths
@@ -83,7 +80,7 @@ const hydrateJSON = async (albumDirectory, size, originals, successCallback) => 
 
             while (!imgFound) {
                 try {
-                    baseFileName = replaceLastOrAdd(fileName, size, imgTypes.shift());
+                    baseFileName = replaceLastOrAdd(fileName, 'svg', imgTypes.shift());
                     original = await Jimp.read(path.join(originalDirectory, baseFileName));
                     imgFound = true;
                     confirmedOriginals.push(baseFileName);

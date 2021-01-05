@@ -286,7 +286,7 @@ const processActiveImages = (() => {
         return albumPath => {
             console.log(' ');
             console.log('---- ' + albumPath + ' --- Collect all metadata in a json file ----');
-            hydrateJSON(albumPath, 'svg', DEFAULT_IMAGE_DIRECTORY, jsonSuccess);
+            hydrateJSON(albumPath, jsonSuccess);
         };
 
     };

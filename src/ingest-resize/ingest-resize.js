@@ -282,6 +282,7 @@ const processActiveImages = (() => {
 
     const buildAlbumConversionSuccess = (allAlbums, successCallback) => {  
 
+        /*
         const finished = [];
 
         const jsonSuccess = (albumPath) => {
@@ -292,11 +293,12 @@ const processActiveImages = (() => {
                 if (successCallback) { successCallback(); }
             }
         };
+        */
 
         return albumPath => {
             console.log(' ');
             console.log('---- ' + albumPath + ' --- Collect all metadata in a json file ----');
-            hydrateJSON(albumPath, jsonSuccess);
+            hydrateJSON(albumPath, successCallback);
         };
 
     };
@@ -340,10 +342,15 @@ const processActiveImages = (() => {
             }
         }
 
+
+        const surveyNext = albumPath => {
+            surveyAlbum(albumPath, albumTransform, conversionSuccess);
+        };
+
         const proceed = () => {
             if (albumPaths.length) {
                 const albumPath = albumPaths.shift();
-                surveyAlbum(albumPath, albumTransform, conversionSuccess);
+                surveyNext(albumPath);
             } else if (successCallback) { 
                 successCallback(); 
             }

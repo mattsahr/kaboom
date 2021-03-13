@@ -92,7 +92,7 @@ The gallery keeps directories as simple and flat as possible, with file naming r
 ----
 
 **More Design Thoughts**  
-I had a lot more stuff about designing static site generators.  But it's fairly [tangential]('rationale.md').
+I had a lot more stuff about designing static site generators.  But it's fairly [tangential](https://github.com/mattsahr/kaboom/blob/master/rationale.md).
 
 ----
 

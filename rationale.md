@@ -64,7 +64,7 @@ A good static site generator should not do that.
 
 <h4 id="single-whole"><span style="font-size: 1.4em">3. </span> Complete Whole</h4>
 
-The promise of a document, in the human-centric pre-internetz sense, is that it is a whole complete thing.  Arguably, documents don't succeed, but there is a contract between people, that the documents we make ***attempt*** to be whole and complete.  A document ought to have a beginning, middle and end.  It ought have a purpose, which can be consumed by itself by a human, at the end of which its purpose (or vague aim or hope, hankering) might reasonably be achieved.
+The promise of a document, in the human-centric pre-internetz sense, is that it is a whole complete thing.  Arguably, documents often don't succeed at being complete.  But there is a contract between people, that the documents we make ***attempt*** to be whole and complete.  A document ought to have a beginning, middle and end.  It ought have a purpose, which can be consumed by itself by a human, at the end of which its purpose (or vague aim or hope, hankering) might reasonably be achieved.
 
 Like if you get to the end of War And Peace --  maybe it landed on your soul, maybe not, but the structural bit succeeded -- the whole document was the sum total, all of Tolstoy's attempt.  You close the book and look up, smug from you Almond Chai-Latte and wink at the other cafe denizens.  "Yo Dawg.  I just Finished War and Peace.  Document.  Complete!"  They clap for you.  A document has landed.  
 

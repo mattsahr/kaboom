@@ -1,33 +1,44 @@
 # Kaboom.
-A tiny, fast static site photo gallery with a linear narrative display scheme.  Written in node.js and Svelte.
+A small, fast, static site photo gallery.  Written in node.js and Svelte.
 
-[Design Goals](#design-goals)  
-[Installation](#installation)  
-[Kaboom CLI](#cli-help)  
-[Directory Structure](#directory-structure)  
+**TLDR INSTALL**  
+install [Node](https://nodejs.org/)  
+install [Primitive](https://github.com/fogleman/primitive)  
+install [NConvert](https://www.xnview.com/en/nconvert/)  
+
+```
+git clone https://github.com/mattsahr/kaboom.git
+cd kaboom
+npm install
+npm link
+kaboom init
+kaboom serve
+```
+
+[Full Installation Guide](#installation)  
 
 <p><br /></p> 
 
 <h3 id="design-goals">DESIGN GOALS</h3>
 
 **Startup Bundle Size**  
-The gallery focuses on quick load & first-paint.  Total bundle size is under 50kB (gzipped) -- with inline images included.  The last bit (inline images) is the kicker: delivering the first 10 browseable images, with lightbox and descriptions, in under 50k.
+The gallery focuses on quick load & first-paint.  Total bundle size is under 50kB (gzipped) -- with inline images included.  That last bit -- inline images included -- is the kicker: delivering the first 10 browseable images, with a "zoom in" lightbox and description/captions, in under 50k.
 
-| Above the fold       |   raw     |    gzip   |    brotli   |
-|----------------------|----------:|----------:|------------:|
-|  index.html          |   3.8 kB  |   2.1 kB  |     1.3 kB  |
-|  album-basic.js      |  55.3 kB  |  19.8 kB  |    16.6 kB  |
-|  bundle-basic.css    |   4.9 kB  |   1.7 kB  |     1.1 kB  |
-|  album-1-to-10.json  |  30.9 kB  |  14.0 kB  |    11.2 kB  |
+| Above the fold       |     raw     |       gzip   |      brotli   |
+|----------------------|------------:|-------------:|--------------:|
+|  index.html          |     3.8 kB  |      2.1 kB  |       1.3 kB  |
+|  album-basic.js      |    55.3 kB  |     19.8 kB  |      16.6 kB  |
+|  bundle-basic.css    |     4.9 kB  |      1.7 kB  |       1.1 kB  |
+|  album-1-to-10.json  |    30.9 kB  |     14.0 kB  |      11.2 kB  |
 |  **TOTAL**           | **94.9 kB** |  **37.6 kB** |  **30.2 kB**  |
 
 There are more files that load "below the fold", including the nav menu (JS and CSS), and images past the first 10 in an album.  But these below-the-fold files arrive in a second phase and shouldn't affect startup speed.  
 
-| Below the fold       |   raw     |    gzip   |    brotli   |
-|----------------------|----------:|----------:|------------:|
-|  nav-app.js          |  32.6 kB  |  11.4 kB  |     9.5 kB  |
-|  bundle-nav.css      |   4.7 kB  |   2.0 kB  |     1.3 kB  |
-|  album-11-plus.json  |  53.8 kB  |  23.0 kB  |    18.9 kB  |
+| Below the fold       |     raw     |       gzip   |      brotli   |
+|----------------------|------------:|-------------:|--------------:|
+|  nav-app.js          |    32.6 kB  |     11.4 kB  |       9.5 kB  |
+|  bundle-nav.css      |     4.7 kB  |      2.0 kB  |       1.3 kB  |
+|  album-11-plus.json  |    53.8 kB  |     23.0 kB  |      18.9 kB  |
 |  **TOTAL**           | **91.1 kB** |  **36.4 kB** |  **29.7 kB**  |
 
 To some extent, your mileage will vary concerning the size of the `album-1-to-10.json` file.  It depends on how much description text you include.  If you write a novel to accompany each image, the JSON is going to get bigger.
@@ -44,25 +55,39 @@ The "large" version of any given image only loads when a user opens the lightbox
 ---
 
 **Good Place Holders**  
-The gallery makes good-looking inline placeholder images by using Michael Fogleman's amazing [Primitive](https://github.com/fogleman/primitive) library.  The placeholder images are rendered as simplified geometric mosaics, like this one. 
+The gallery aims to make good-looking inline placeholder images by using Michael Fogleman's amazing [Primitive](https://github.com/fogleman/primitive) library.  The placeholder images are rendered as simplified geometric mosaics, like this one. 
+
+<div style="width: 100%; display:flex; justify-content: center">
 
 ![Demo Primitive](./src/dummy/demo.svg)
 
-Place-holders are svg, made of 100 overlapping ovals.  The [Primitive](https://github.com/fogleman/primitive) library has many other options besides ovals, but I found that ovals look pretty good on a broad array of images, and they are VERY easy to compress.
+</div>
+
+Place-holders are svg, made of 100 overlapping ovals.  Data for each place-holder amounts to about 3k of uncompressed json.  The [Primitive](https://github.com/fogleman/primitive) library has many other options besides ovals, but I found that ovals look pretty good on a broad array of images, and they are VERY easy to compress.
 
 ---
 
-**Narrative Focus**  
-The gallery privileges description text.  It makes room for description, listing the text side-by side when the screen is wide enough.  
+**Layout Style: Image + Description**  
+The layout gives text a fair amount of prominence.  It makes room for descriptions, listing the text side-by side when the screen is wide enough.  
+
+<div style="width: 100%; display:flex; justify-content: center;">
 
 ![Demo Gallery Snapshot](./src/dummy/demo-gallery-snapshot.jpg)
 
-If you don't care about descriptions, this gallery might not be a good fit...?  But there are some layout settings to adjust this stuff.
+<div style="padding: 1em 0 0 2em;">
+
+If you don't care about descriptions, this gallery might not be a good fit...?  
+
+Or at least, you'd have to restyle a bit.  In this case, styling involves editing the Svelte files.  Since the total CSS bundle is under 5k, restyling should be pretty manageable.
+
+</div>
+</div>
+
 
 ---
 
-**Simple Directories**  
-The gallery keeps directories simple and flat as possible, with simple naming rules, to allow straightforward deployment by FTP or equivalent.  See the [directory structure section](#directory-structure) for details.
+**Human Readable Directories**  
+The gallery keeps directories as simple and flat as possible, with file naming rules aimed at being understandable by humans.  The directories are built for straightforward deployment by FTP or equivalent.  See the [directory structure section](#directory-structure) for details.
 
 ----
 <p><br /></p> 
@@ -79,7 +104,7 @@ In addition to node.js and npm, you will need to install two external libraries.
 
 Both Primitive and NConvert are available for Windows, Mac, Linux.
 
-**Install kaboom**  
+**Installing kaboom**  
 ```
 git clone https://github.com/mattsahr/kaboom.git
 cd kaboom
@@ -101,36 +126,32 @@ Type this command to add a demo album:
 kaboom init
 ```
 
-After running "kaboom init", The root /kaboom/ directory should now contain a "gallery-active" directory and a "gallery-static" directory (among others).
+Running "kaboom init" will make a /gallery/ directory, just below the /kaboom/ directory.  it will then populate that /gallery/ with a directory called "demo-album"
 
 ```
 kaboom
- -- gallery-active
+ -- gallery
     -- demo-album
-       -- __original
+       -- ++original
           -- kaboom_1_demo.png
           -- kaboom_2_demo.jpg
           -- kaboom_3_demo.jpeg
           -- kaboom_4_demo.gif
     -- favicon.png
- -- gallery-static
-    -- favicon.png
 ```
 
-Inside "demo-album", there is an "__original" directory.  That is where you put your original images.  To process these images and prep them for the server, run the "kaboom ingest" command.  
-**NOTE** -- you must have **nconvert** and **primitive** installed for this step.
+The "init" command will then process these images and make various sized versions.   **NOTE** -- you must have **nconvert** and **primitive** installed for the "init" command to complete successfully.   
 
-```
-kaboom ingest demo-album
-```
+**Wait for it**  
+The step where the svg images get made takes a while.  On my 2016 era laptop, it takes about 30 seconds per image.
 
-The ingest command makes various sizes of the source images, as well as a placeholder svg image, and then populates some JSON files with metadata about the images.  Once the ingest command has run, you should be able to run the server, and see your album.
+After a minute or two, the "init" process should complete.  Then you should be able to run the server, and see your album.
 
 ```
 kaboom serve
 ```
 
-In a web browser, browse to [http://localhost:2317](http://localhost:2317)
+In a web browser, browse to [http://localhost:4444](http://localhost:4444)
 
 At this point, on the web page, you should be able to click in the "Description" area of any image, and add text.  There will also be two icons at the top right of the page -- "metadata" and "arrange" buttons.
 
@@ -139,9 +160,7 @@ At this point, on the web page, you should be able to click in the "Description"
 
 <h3 id="directory-structure">DIRECTORY STRUCTURE</h3>
 
-Photo gallery libraries tend to get ambitious -- they want to be the place that a user organizes all of their photos.  For instance [Photoiew](https://photoview.github.io/) looks pretty cool for that purpose.  
-
-The "Kaboom" library has a much smaller scope - to organize specific photos for web presentation, based on directories.  It does this with two directories, "gallery-static" and "gallery-active".  These directories are not included in the git repo, but you can generate and populate them with this command, run from the root of your "kaboom" project directory.
+The "Kaboom" library has a small scope - to organize albums for web presentation, based on directories.  All albums are built inside a "gallery" directory.  The "gallery" directory is not included in the git repo, but you can generate it and populate a demo album with this command, run from the root of your "kaboom" project directory.
 
 ```cli
 $~/kaboom> kaboom init
@@ -149,11 +168,11 @@ $~/kaboom> kaboom init
 
 See the [CLI section](#cli-help) for more.
 
-**The `gallery-static` Directory**  
+**The `gallery` Directory**  
 The gallery expects to be flat -- a list of album directories at the top level, such that every album is a peer.  like this...
 
 ```
-gallery-static
+gallery
  -- first-album-url
  -- second-album-url
  -- third-album-url
@@ -166,21 +185,21 @@ Each album has what I like to think is a reasonable, human-comprehensible struct
 
 ```
 first-album-url
- -- __original
+ -- ++original
      -- image-1.jpg
      -- image-2.png
      -- image-3.jpeg
      -- image-4.gif
 ```
 
-To include photos in a given album: you put the image files in the `__original` sub-directory.  
+To include photos in a given album: you put the image files in the `++original` sub-directory.  You can also use the `kaboom add` command (see the [cli section](#cli-help)).
 
 After the library processes all the images, your directory will look like this:
 
 ```
 first-album-url
- -- __app
- -- __original
+ -- ++app
+ -- ++original
  -- large
  -- medium
  -- small
@@ -195,8 +214,8 @@ The generated image files are fairly explicit and understandable.
 
 ```
 first-album-url
- -- __app
- -- __original
+ -- ++app
+ -- ++original
      -- image-1.jpg
      -- image-2.png
      -- image-3.jpeg
@@ -273,29 +292,129 @@ Once you have run `npm install` and then `npm link`, the "kaboom" command should
 
 ```
 $> kaboom
+__________________________
 
-------- KABOOM -----------                                                
-                                                                          
- kaboom                   short help file                                 
- kaboom help              full help file                                  
-                                                                          
- kaboom init              add /gallery-static, /gallery-active/demo-album 
- kaboom serve             run the web server on //localhost:2713                    
-                                                                          
- kaboom ingest            process images, all albums in /gallery-active   
- kaboom ingest [name]     process images in /gallery-active/[name]        
-                                                                          
- kaboom to-static         move all /gallery-active to /gallery-static     
- kaboom to-static [name]  move /gallery-active/[name] to /gallery-static  
-                                                                          
- kaboom to-active         move all /gallery-static to /gallery-active     
- kaboom to-active [name]  move /gallery-static/[name] to /gallery-active  
-                                                                          
---------------------------                                                
-                                                                          
+  kaboom                   Short help file
+  kaboom help              Full help file
+
+  kaboom init              Make a /gallery/ directory and put a /demo-album/ inside
+
+  kaboom serve             Run a web server on localhost:4444
+  kaboom serve static      Run a web server on localhost:4444, static version
+
+  kaboom add               From the curent directory, add all images to a new album
+
+  kaboom ingest            Choose an album, resize & make placeholders for all images
+
+  kaboom compare           Declare a remote deploy directory, check what needs updated
+
+  kaboom static            Set albums to static, ready for FTP or other delivery
+__________________________
 ```
 
+---
+<p><br /></p> 
 
+<h3 id="site-config">Site Config File</h3>
 
+Once you run `kaboom init`, there will be a config file located in the /src/ directory.
+
+```
+/kaboom/src/site-config.json
+```
+
+Some day I hope to make some nice UX inside the app, for editing the site config.  But for now, you will need to edit the JSON yourself, when you want to adjust home page nav, or any desired "extra" links.  The JSON looks like this:
+
+```json
+{
+    "custom_nav": {
+        "homeButton": "standard",
+        "homeCustom": {
+            "title": "Back to Main Site",
+            "subtitle_A": "Not in use, homeButton set to 'standard'",
+            "url": "../"
+        },
+        "homeRedirect": "demo-album",
+        "bottomLinks": {
+            "category": "Related Sites",
+            "links": [
+                {
+                    "title": "Kaboom Project",
+                    "subtitle_A": "Github",
+                    "url": "https://github.com/mattsahr/kaboom"
+                },
+                {
+                    "title": "Another Rando Link",
+                    "subtitle_A": "edit /src/site-config.json",
+                    "url": "https://example.com"
+                }
+            ]
+        }
+    }
+}
+```
+
+<p><br /></p>
+
+**HOME PAGE**  
+The kaboom project builds a "home" page by taking one image from each child album.  The "home" index.html page sits in the root /gallery/ directory.  And the "home" button in the nav points to the index.html page in the root `/gallery/` directory.  That's the setup out of the box, but you can adjust it.  
+
+**CUSTOM HOME**  
+If you want to use your own custom home page -- **DON'T** store it in the /gallery/ directory.  Store it somewhere else, and feed a copy into /gallery/index.html when you deploy.  The build process updates the built-in /gallery/index.html page, so it will overwrite whatever resides there.
+
+**NO HOME PAGE**  
+You may not want a "home" page.  The nav can simply link sibling albums to each other, without using a "home" at the root.  To avoid any home page at all, edit the /src/site-config.json file:
+
+1.  Set `"homeButton": "none"`
+
+```json
+{
+    "custom_nav": {
+        "homeButton": "none",
+        ...
+    }
+}
+```
+
+<p><br /></p>
+
+**CUSTOM BUTTON**  
+Instead of using /gallery/ as a "home", you can override the nav so that the "home" button says what you want, and links where you want. To use the override, edit the /src/site-config.json file:
+
+1.  Set `"homeButton": "custom"`
+2.  Edit the `"homeCustom"` object to use your details.
+
+```json
+{
+    "custom_nav": {
+        "homeButton": "custom",
+        "homeCustom": {
+        "title": "Your text",
+            "subtitle_A": "Your Subtitle",
+            "url": "https://your.link.com"
+        },
+        ...
+    }
+}
+```
+
+<p><br /></p>
+
+**OTHER NAV LINKS**  
+The `/kaboom/src/site-config.json` has a section called `"bottomLinks"` where you can append extra items that will appear in the nav after all the gallery pages.  If you don't want extra links, delete the `"bottomLinks"` object, or set the `bottomLinks.links` to be an empty array.
+
+```json
+// AN EMPTY "links" ARRAY MEANS NOTHING 
+// WILL BE DISPLAYED BELOW THE ALBUMS LIST
+{
+    "custom_nav": {
+        ...
+        "bottomLinks": {
+            "category": "",
+            "links": []
+        }
+    }
+}
+```
 
 

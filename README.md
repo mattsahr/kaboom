@@ -90,6 +90,12 @@ Or at least, you'd have to restyle a bit.  In this case, styling involves editin
 The gallery keeps directories as simple and flat as possible, with file naming rules aimed at being understandable by humans.  The directories are built for straightforward deployment by FTP or equivalent.  See the [directory structure section](#directory-structure) for details.
 
 ----
+
+**More Design Thoughts**  
+I had a lot more stuff about designing static site generators.  But it's fairly [tangential]('rationale.md').
+
+----
+
 <p><br /></p> 
 
 <h3 id="installation">INSTALLATION</h3>

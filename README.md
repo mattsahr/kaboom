@@ -449,24 +449,47 @@ Some of the framework stuff is in `/kaboom/app/base/`
 The svelte process builds into the `/kaboom/app/pages/` directory.  
 The `/localhost:5000` dev server finds its stuff in  `/kaboom/app/pages/`
 
-The kaboom CLI build processes pick up already-built files from `/kaboom/app/pages/` and copy them into the various directories in `/kaboom/gallery/`.
-
 There are actually 3 apps built by the svelte build process.
 
 ```
 SOURCE  /kaboom/app/templates/Album.svelte
-BUILD   /kaboom/app/pages/++app/album-app.js
+BUILDS  /kaboom/app/pages/++app/album-app.js
 
 SOURCE  /kaboom/app/templates/AlbumBasic.svelte
-BUILD   /kaboom/app/pages/++app/album-basic.js
+BUILDS  /kaboom/app/pages/++app/album-basic.js
 
 SOURCE  /kaboom/app/templates/Nav.svelte
-BUILD   /kaboom/app/pages/nav-app.js
+BUILDS  /kaboom/app/pages/nav-app.js
 ```
 
-These "album-basic.js" app is, generally, what you want to deploy.  While the "album-app.js" app is the one with all the on-page editors built in.
+The basic version -- `album-basic.js` -- is generally what you want to deploy.  
+The full version --  `album-app.js` -- is for locally editing pages.
 
 There is nothing that dictates the "basic" app should look anything like the full app.  At the moment they look almost identical, but that's just me.  If you want to change the look and feel of the public-facing galleries -- mess around with the "basic" app.
+
+**The CLI and the app flavors**  
+The kaboom CLI picks up already-built files from `/kaboom/app/pages/`  
+It copies them into the various directories in `/kaboom/gallery/`  
+
+When you run either of these commands...
+
+```
+kaboom static
+kaboom serve static
+```
+
+it propagates `album-basic.js` to the galleries.  
+
+<p><br /></p>
+
+When you run this command...
+  
+```
+kaboom serve
+``` 
+
+it propagates `album-app.js` to the galleries instead.
+
 
 <p><br /></p>
 
@@ -479,4 +502,6 @@ There is nothing that dictates the "basic" app should look anything like the ful
 -- It is annoying, time-consuming, that when you want to just add a photo to an existing album, `kaboom add` re-runs the entire ingest process.
 
 -- The `site-config.json` file is fine, but it would be better if all that stuff was editable from inside the app.
+
+-- The deployed nav app would be smaller if we had a "nav-basic.js" build without the editor.
 

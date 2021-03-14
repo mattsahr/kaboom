@@ -13,7 +13,11 @@ app/node_modules/
 
 ### Working Resources
 __resources/
-app/pages/__original/
+src/constants.js
+src/remote-urls.json
+
+### App Build Files
+app/pages/++original/
 app/pages/microscopic/
 app/pages/tiny/
 app/pages/small/
@@ -21,11 +25,9 @@ app/pages/medium/
 app/pages/large/
 app/pages/png/
 app/pages/svg/
-app/pages/__app/album-app.js.map
-
+app/pages/++app/album-app.js.map
 
 ### Gallery Data
-gallery-active/
-gallery-static/
-source_album_json/
-home-config.json
+gallery-actual/
+gallery/
+src/site-config.json

@@ -1,17 +1,35 @@
-const { helpFile, pp, shortHelp, unknownArg } = require('./help-file.js');
+const { 
+    helpFile, 
+    pp, 
+    shortHelp, 
+    unknownArg 
+} = require('./help-file.js');
 const buildDirectories = require('./build-directories/build-directories.js');
 const processActiveImages = require('./ingest-resize/ingest-resize.js');
-const checkStructure = require ('./helpers/check-structure.js');
+const {
+    checkStructure,
+    checkStructureInit 
+} = require ('./helpers/check-structure.js');
 const { waitSerial } = require('./helpers/helpers.js');
-const { toStatic, toActive } = require('./helpers/move-albums.js');
-const hydrateJSON = require ('./hydrate/hydrate-json.js');
+const deployCompare = require('./deploy/deploy-compare.js');
+// const hydrateJSON = require ('./hydrate/hydrate-json.js');
+const addAlbum = require ('./add-album/add-album.js');
 const hydrateApp = require('./hydrate/hydrate-app.js');
 const hydrateNavJSON = require('./hydrate/hydrate-nav-json');
 const serve = require('./serve/serve.js');
+const init = require('./helpers/init.js');
 
-const test = () => { console.log( '-------- TEST CALLBACK >>> Finished! ---------'); };
 
-const cli = (args) => {
+const test = () => { 
+    console.log( '-------- TEST CALLBACK >>> Finished! ---------'); 
+    process.exit(0);
+};
+
+const exitCallback = () => {
+    process.exit(0);
+};
+
+const cli = args => {
 
     const command = args[2];
     const option = args[3];
@@ -26,44 +44,61 @@ const cli = (args) => {
         case '-h':
         case '-help':
         case '--help':
-            helpFile.map(pp);
-            break;
-
-        case 'to-static':
-            waitSerial({
-                checkStructure,
-                thenToStatic: toStatic(option)
-            });
-            break;
-
-        case 'to-active':
-            waitSerial({
-                checkStructure,
-                thenToActive: toActive(option)
-            });
+            if (option) { 
+                if (helpFile[option]) {
+                    helpFile[option].map(pp);    
+                } else {
+                    shortHelp.map(pp);
+                    console.log('');
+                    console.log('Unknown command: "kaboom ' + option + '"');
+                    console.log('');
+                    console.log('');
+                }
+            } else {
+                helpFile.default.map(pp);
+            }
             break;
 
         case 'serve':
             waitSerial({
                 checkStructure,
-                hydrateApp,
+                hydrateApp: hydrateApp(option),
                 thenHydrateNav: hydrateNavJSON(serve)
             });
             break;
 
-        case 'init': 
-            checkStructure(buildDirectories, 'init');
+        case 'init': {
+            waitSerial({
+                init,
+                checkStructureInit,
+                buildDirectories,
+                processDemo: processActiveImages('demo-album',exitCallback, 'skipNameInput')
+            });
             break;
+        }
 
         case 'ingest':
             waitSerial({
                 checkStructure,
-                thenProcessImages:  processActiveImages(option /*, callbackNext */)
+                thenProcessImages:  processActiveImages(option, exitCallback, option)
             });
             break;
 
+        case 'compare':
+            deployCompare(option, test);
+            break;
+
+        case 'add':
+            addAlbum(test);
+            break;
+
+        case 'static':
+            hydrateApp('static')(exitCallback);
+            break;
+
         case 'test':
-            hydrateJSON('./gallery-active/africa-ethiopia', test);
+            init();
+            // hydrateJSON('./gallery-active/africa-ethiopia', test);
             break;
 
         default: 

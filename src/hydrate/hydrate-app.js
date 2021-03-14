@@ -1,15 +1,17 @@
 const fs = require('fs');
 const path = require( 'path' );
 const { minify } = require('html-minifier');
-const { checkFile, waitSerial } = require('../helpers/helpers.js');
+const { 
+    checkFile, 
+    waitSerial 
+} = require('../helpers/helpers.js');
 const { 
     APP_DIRECTORY,
     APP_LOCAL_DIRECTORY,
-    GALLERY_ACTIVE_PATH,
-    GALLERY_STATIC_PATH
+    GALLERY_MAIN_PATH
 } = require('../constants.js');
 
-const requiredDirectories = [ '__app' ];
+const requiredDirectories = [ APP_LOCAL_DIRECTORY ];
 
 // const writeToRoot = async (albumRoot, fileName, file, successCallback) => {
 
@@ -18,6 +20,7 @@ const requiredDirectories = [ '__app' ];
 // };
 
 const notAppDir = dir => dir !== APP_LOCAL_DIRECTORY;
+
 
 const writeToAlbums = async (albumRoot, fileName, file, successCallback) => {
 
@@ -71,20 +74,18 @@ const writeToAlbums = async (albumRoot, fileName, file, successCallback) => {
         }
     };
 
-    writeToRoot(fileName, albumRoot)(localSuccessCallback);
+    writeToRoot(fileName, albumRoot, file)(localSuccessCallback);
 
 };
 
 const hydrateAppFile = (fileName, albumsPath) => async successCallback => {
-
-    const filePath = path.join('__app/', fileName);
+    const filePath = path.join(APP_LOCAL_DIRECTORY, fileName);
     const sourcePath = path.join(APP_DIRECTORY, filePath);
     const file = await fs.promises.readFile(sourcePath, 'utf8');
-
     writeToAlbums(albumsPath, filePath, file, successCallback);
 };
 
-const writeToRoot = (fileName, directory) => async successCallback => {
+const writeToRoot = (fileName, directory, file) => async successCallback => {
     if (!checkFile(directory)) {
         console.log('------- WRITE ' + fileName + '  -- NO GALLERY ROOT: ' + directory + ' -----');
         successCallback();
@@ -99,13 +100,19 @@ const writeToRoot = (fileName, directory) => async successCallback => {
     }
 
     const sourcePath = path.join(APP_DIRECTORY, fileName);
-    const file = await fs.promises.readFile(sourcePath, 'utf8');
     const writePath = path.join(directory, fileName);
-    fs.writeFile(writePath, file, successCallback);
+
+    if (file) {
+        fs.writeFile(writePath, file, successCallback);
+    } else {
+        const fileToSave = await fs.promises.readFile(sourcePath, 'utf8');
+        fs.writeFile(writePath, fileToSave, successCallback);
+    }
+
 };
 
 
-const hydrateHTML = async (successCallback) => {
+const hydrateHTML = (() => {
 
     const minProps  = {
         collapseWhitespace: true,
@@ -118,61 +125,88 @@ const hydrateHTML = async (successCallback) => {
         minifyJS: true
     };
 
-    const source = path.join(APP_DIRECTORY, 'index.html');
-    const indexHtml = await fs.promises.readFile(source, 'utf8');
-    const minified = minify(indexHtml, minProps);
+    const saveStaticBackup = callback => async () => {
+        const sourceBasic = path.join(APP_DIRECTORY, 'basic.html');
+        const basicHtml = await fs.promises.readFile(sourceBasic, 'utf8');
+        const minifiedBasic = minify(basicHtml, minProps);
+        const target = path.join(APP_LOCAL_DIRECTORY, 'index-basic.html');
+        writeToAlbums(GALLERY_MAIN_PATH, target, minifiedBasic, callback);
+    };
 
-    const firstBatchCallBack = async () => {
+    const saveActiveBackup = callback => async () => {
+        const source = path.join(APP_DIRECTORY, 'index.html');
+        const indexHtml = await fs.promises.readFile(source, 'utf8');
+        const minified = minify(indexHtml, minProps);
+        const target = path.join(APP_LOCAL_DIRECTORY, 'index-active.html');
+        writeToAlbums(GALLERY_MAIN_PATH, target, minified, callback);
+    };
 
+    const hydrateRootHTML = (sourceName, callback) => async () => {
+        const source = path.join(APP_DIRECTORY, sourceName);
+        const indexHtml = await fs.promises.readFile(source, 'utf8');
+        const minified = minify(indexHtml, minProps);
+        writeToRoot('index.html', GALLERY_MAIN_PATH, minified)(callback);
+    };
+
+    const hydrateActive = async successCallback => {
+        const source = path.join(APP_DIRECTORY, 'index.html');
+        const indexHtml = await fs.promises.readFile(source, 'utf8');
+        const minified = minify(indexHtml, minProps);
+
+        const saveBackup = saveStaticBackup(successCallback);
+        const hydrateRoot = hydrateRootHTML('home.html', saveBackup);
+        writeToAlbums(GALLERY_MAIN_PATH, 'index.html', minified, hydrateRoot);
+    };
+
+    const hydrateStatic = async successCallback => {
         const sourceBasic = path.join(APP_DIRECTORY, 'basic.html');
         const basicHtml = await fs.promises.readFile(sourceBasic, 'utf8');
         const minifiedBasic = minify(basicHtml, minProps);
 
-        writeToAlbums(GALLERY_STATIC_PATH, 'index.html', minifiedBasic, successCallback);
+        const saveBackup = saveActiveBackup(successCallback);
+        const hydrateRoot = hydrateRootHTML('home-basic.html', saveBackup);
+        writeToAlbums(GALLERY_MAIN_PATH, 'index.html', minifiedBasic, hydrateRoot);
     };
 
-    writeToAlbums(GALLERY_ACTIVE_PATH, 'index.html', minified, firstBatchCallBack);
-};
-
-const app =             hydrateAppFile('album-app.js', GALLERY_ACTIVE_PATH);
-const appCSS =          hydrateAppFile('bundle.css', GALLERY_ACTIVE_PATH);
-const appGlobalCSS =    hydrateAppFile('global.css', GALLERY_ACTIVE_PATH);
-
-const basic =           hydrateAppFile('album-basic.js', GALLERY_STATIC_PATH);
-const basicCSS =        hydrateAppFile('bundle-basic.css', GALLERY_STATIC_PATH);
-
-const navActiveCSS =    writeToRoot('bundle-nav.css', GALLERY_ACTIVE_PATH);
-const navStaticCSS =    writeToRoot('bundle-nav.css', GALLERY_STATIC_PATH);
-const navActive =       writeToRoot('nav-app.js', GALLERY_ACTIVE_PATH);
-const navStatic =       writeToRoot('nav-app.js', GALLERY_STATIC_PATH);
-// const basicGlobalCSS =  hydrateAppFile('global-basic.css', GALLERY_STATIC_PATH);
-
-const hydrateApp = (() => {
-
-    return async (successCallback) => {
-
-        waitSerial(
-            {
-                hydrateHTML,
-
-                app,
-                appCSS,
-                appGlobalCSS,
-
-                basic,
-                basicCSS,
-
-                navActive,
-                navStatic,
-                navActiveCSS,
-                navStaticCSS
-
-            },
-            successCallback
-            // 'REPORT'
-        );
+    return {
+        active: hydrateActive,
+        static: hydrateStatic
     };
 
 })();
+
+const app =        hydrateAppFile('album-app.js', GALLERY_MAIN_PATH);
+const appCSS =     hydrateAppFile('bundle.css', GALLERY_MAIN_PATH);
+const globalCSS =  hydrateAppFile('global.css', GALLERY_MAIN_PATH);
+                        
+const basic =      hydrateAppFile('album-basic.js', GALLERY_MAIN_PATH);
+const basicCSS =   hydrateAppFile('bundle-basic.css', GALLERY_MAIN_PATH);
+
+const nav =        writeToRoot('nav-app.js', GALLERY_MAIN_PATH);
+const navCSS =     writeToRoot('bundle-nav.css', GALLERY_MAIN_PATH);
+
+
+const hydrateApp = status => async (successCallback) => {
+
+    waitSerial(
+        {
+            hydrateHTML: hydrateHTML[status] || hydrateHTML['active'],
+
+            app,
+            appCSS,
+            globalCSS,
+
+            basic,
+            basicCSS,
+
+            nav,
+            navCSS
+
+        },
+        successCallback
+        // 'REPORT'
+    );
+
+};
 
 module.exports = hydrateApp;

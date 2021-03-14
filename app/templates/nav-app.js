@@ -1,5 +1,6 @@
 import Nav from './Nav.svelte';
 import NavStore from './store/nav-store';
+import { GALLERY_IS_HOME_PAGE } from './utility/constants';
 
 const hydrateSharedData = navData => {
     const categories = [];
@@ -14,9 +15,11 @@ const hydrateSharedData = navData => {
         }
     }
 
+    console.log('hydrateSharedData', navData);
+
     window.NAV_DATA = window.NAV_DATA || {};
     window.NAV_DATA.categories = categories;
-    window.NAV_DATA.NAV_ROOT = navData.navRoot || '../';
+    window.NAV_DATA.NAV_ROOT = navData.navRoot;
 
 };
 
@@ -25,6 +28,15 @@ const NavApp = navData => {
     if (!navData) {
         console.error('navData not found');
         return;
+    }
+
+    if (window.NAV_DATA) {
+        if (window.NAV_DATA[GALLERY_IS_HOME_PAGE]) {
+            navData[GALLERY_IS_HOME_PAGE] = true;
+        }
+        if (window.NAV_DATA.currentURL) {
+            navData.currentURL = window.NAV_DATA.currentURL;
+        }
     }
 
     console.log('navData!', navData);

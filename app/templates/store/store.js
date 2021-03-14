@@ -15,7 +15,17 @@ const createGalleryStore = () => {
             if (window.Network && window.Network.save) {
                 window.Network.save(GALLERY);
             }
-        }, 50);
+
+            window.GALLERY = GALLERY;
+        }, 30);
+    };
+
+    const saveDeletion = (fileName) => {
+        setTimeout(() => {
+            if (window.Network && window.Network.deleteImage) {
+                window.Network.deleteImage(fileName);
+            }
+        }, 60);
     };
 
     const stampTime = obj => {
@@ -51,7 +61,6 @@ const createGalleryStore = () => {
             }
         }
 
-        console.log('UPDATED ADD IMAGES', updated);
         set(updated);
     };
 
@@ -164,6 +173,15 @@ const createGalleryStore = () => {
         set(updated); save();
     };
 
+    const deleteImage = fileName => {
+        const updated = { ...GALLERY };
+        updated.images = GALLERY.images.filter(image => image.fileName !== fileName);
+        stampTime(updated);
+        set(updated); 
+        save();
+        saveDeletion(fileName);
+    };
+
     return {
         updateImages,
         getAllImages,
@@ -181,6 +199,7 @@ const createGalleryStore = () => {
 
         hide,
         unhide,
+        deleteImage,
 
         subscribe,
         set,

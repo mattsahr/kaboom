@@ -35,7 +35,7 @@ const defaults = {
         __css_global_file_name__: '',
         __css_bundle_file_name__: '__app/default-bundle.css',
         __html_bundle_output__: 'default-index.html',
-        __css_nav_file_name__: '/default-nav.css'   
+        __css_nav_file_name__: '/default-nav.css'
     },
     includes: []
 };

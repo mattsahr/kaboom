@@ -1,9 +1,11 @@
 <script>
     import Editor from 'cl-editor';
+    import AlbumLink from './AlbumLink.svelte';
 
     export let updateDescription = () => false;
     export let isPromo = false;
     export let imgData = {};
+    export let isHomePage = false;
 
     let active = false;
     let editor;
@@ -11,6 +13,7 @@
     const actions = ['viewHtml', 'b', 'i', 'u', 'a'];
 
     const updateDesc = htmlString => {
+        console.log('>>>> update?  isHomePage', isHomePage);
         updateDescription(imgData.fileName, imgData.title, htmlString);
     };
 
@@ -31,6 +34,7 @@
     };
 
     const deactivate = () => { 
+        console.log('DEACTIVATE >> isHomePage', isHomePage);
         updateDesc(editor.getHtml());
         active = false;   
     };
@@ -51,6 +55,7 @@
                 html={desc} />
         </div>
     {:else}
+        <AlbumLink {isHomePage} {imgData} />
         <div class="description" on:click={activate}>{@html descHtml}</div>
     {/if}
 </div>

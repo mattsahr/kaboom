@@ -3,10 +3,11 @@
     import { fade } from "svelte/transition";
     import { flip } from "svelte/animate";
     import { dndzone } from "svelte-dnd-action";
+    import { GALLERY_IS_HOME_PAGE } from '../../utility/constants';
+    import { getDocWidth } from '../../utility/dom';
     import GalleryStore from '../../store/store';
     import UXStore from '../../store/ux-store';
     import GalleryItem from '../gallery/GalleryItem.svelte';
-    import { getDocWidth } from '../../utility/dom';
     import MdShuffle from 'svelte-icons/md/MdShuffle.svelte';
     import HiddenPixManager from './HiddenPixManager.svelte';
     import MdClose from 'svelte-icons/md/MdClose.svelte';
@@ -34,8 +35,10 @@
         return batch;
     };
 
+    $: isHomePage = Boolean($GalleryStore[GALLERY_IS_HOME_PAGE]);
+    $: hiddenPix = $GalleryStore.images.filter(image => image.hidden);
     $: visiblePix = $GalleryStore.images.filter(image => !image.hidden);
-    $: gotHidden = visiblePix.length < $GalleryStore.images.length;
+    $: gotHidden = hiddenPix.length;
     $: imageBatches = batchify(visiblePix);
     $: boardClass = 'column-board' + ' ' + mode + ($UXStore.manageHiddenPix ? ' inactive' : '');
     $: hiddenPixClass = 'manage-hidden-toggle' + ($UXStore.manageHiddenPix ? ' active' : '');
@@ -47,11 +50,18 @@
                 update.push(next);
             }
         }
+        for (const next of hiddenPix) {
+            update.push(next);
+        }
         GalleryStore.updateImages(update);
     };
 
     const hideItem = fileName => {
         GalleryStore.hide(fileName);
+    };
+
+    const deleteItem = fileName => {
+      GalleryStore.deleteImage(fileName);  
     };
 
     /*
@@ -123,7 +133,8 @@
 
                 {#each column.items as imgData(imgData.fileName)}
                     <div class="drag-animator"  animate:flip="{{duration: flipDurationMs}}">
-                        <GalleryItem {imgData} {mode} {hideItem} unhideItem={false}
+                        <GalleryItem {imgData} {mode} {hideItem} {deleteItem} unhideItem={false}
+                            isHomePage={isHomePage}
                             setPromo={GalleryStore.setPromo}
                             updateDescription={GalleryStore.updateDescription}
                             updatePromoDescription={GalleryStore.updatePromoDescription}
@@ -212,6 +223,7 @@
     :global(.column-board.arrange .gallery-list) {
         margin: 0 4px 0 4px;
         box-shadow: 2px 2px 10px rgb(0, 0, 0, 0.5);
+        max-width: 400px;
     }
 
     .single :global(.drag-animator:focus) {

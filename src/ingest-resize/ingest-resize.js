@@ -4,11 +4,12 @@ const { copyFile, replaceLastOrAdd } = require('../helpers/helpers.js');
 const nConvert = require('./n-convert.js');
 const primitive = require('./primitive.js');
 const hydrateJSON = require('../hydrate/hydrate-json.js');
-
+const getDirectoryName = require('./get-input-directory.js');
+const { logIntro } = require('./ingest-resize-info.js');
 const {
     APP_LOCAL_DIRECTORY,
     DEFAULT_IMAGE_DIRECTORY,
-    GALLERY_ACTIVE_PATH
+    GALLERY_MAIN_PATH
 } = require('../constants.js');
 
 const notAppDir = dir => dir !== APP_LOCAL_DIRECTORY;
@@ -303,38 +304,22 @@ const processActiveImages = (() => {
 
     };
 
-    return (albumArgument, successCallback) => async () => {
-        const workingPath = GALLERY_ACTIVE_PATH;
+    return (albumArgument, successCallback, skipNameInput) => async () => {
+
+        logIntro();
+
+        const albumName = skipNameInput 
+            ? albumArgument
+            : await getDirectoryName(albumArgument);
+
+        const workingPath = GALLERY_MAIN_PATH;
         const gallery = await fs.promises.readdir(workingPath);
 
-        const albums = [];
+        const albumPaths = [];
         for (const item of gallery.filter(notAppDir)) {
-            if (albumArgument && item !== albumArgument) {
+            if (albumName && item !== albumName) {
                 continue;
             }
-            const albumPath = path.join(workingPath, item);
-            const stat = await fs.promises.stat(albumPath);
-            if (stat.isDirectory()) {
-                albums.push(albumPath);
-            }
-        }
-
-        if (!albums.length) {
-            console.log(' ');
-            if (albumArgument) {
-                console.log('Album [' + albumArgument + '] not found in /gallery-active');
-            } else {
-                console.log('No albums to process in /gallery-active');    
-            }
-            console.log(' ');
-            if (successCallback) { successCallback(); }
-            return;
-        }
-
-
-        const albumPaths = [];
-
-        for (const item of gallery.filter(notAppDir)) {
             const albumPath = path.join(workingPath, item);
             const stat = await fs.promises.stat(albumPath);
             if (stat.isDirectory()) {
@@ -342,6 +327,17 @@ const processActiveImages = (() => {
             }
         }
 
+        if (!albumPaths.length) {
+            console.log(' ');
+            if (albumName) {
+                console.log('Album [' + albumName + '] not found in /gallery-active');
+            } else {
+                console.log('No albums to process in /gallery-active');    
+            }
+            console.log(' ');
+            if (successCallback) { successCallback(); }
+            return;
+        }
 
         const surveyNext = albumPath => {
             surveyAlbum(albumPath, albumTransform, conversionSuccess);
@@ -357,10 +353,6 @@ const processActiveImages = (() => {
         };
 
         const conversionSuccess = buildAlbumConversionSuccess(albumPaths, proceed);
-
-        // for (const albumPath of albumPaths)
-        //     surveyAlbum(albumPath, albumTransform, conversionSuccess);
-        // }
 
         proceed();
 

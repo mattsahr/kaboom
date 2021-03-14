@@ -30,7 +30,9 @@ function copyFile(source, target, cb) {
 
     function done(err) {
         if (!cbCalled) {
-            cb(err);
+            if (cb) { cb(err); } else {
+                console.error('copyFile ERROR', err);
+            }
             cbCalled = true;
         }
     }

@@ -3,14 +3,13 @@ const path = require( 'path' );
 
 const {
     APP_DIRECTORY,
-    GALLERY_ACTIVE_PATH,
-    GALLERY_STATIC_PATH
+    APP_LOCAL_DIRECTORY,
+    GALLERY_MAIN_PATH
 } = require('../constants.js');
 
 const directories = [
     path.join(APP_DIRECTORY, ''),
-    path.join(GALLERY_ACTIVE_PATH, ''),
-    path.join(GALLERY_STATIC_PATH, '')
+    path.join(GALLERY_MAIN_PATH, '')
 ];
 
 const initDirectories = [
@@ -21,11 +20,11 @@ const files = [
     path.join(APP_DIRECTORY, 'basic.html'),
     path.join(APP_DIRECTORY, 'nav-app.js'),
     path.join(APP_DIRECTORY, 'bundle-nav.css'),
-    path.join(APP_DIRECTORY, '__app/album-app.js'),
-    path.join(APP_DIRECTORY, '__app/album-basic.js'),
-    path.join(APP_DIRECTORY, '__app/bundle.css'),
-    path.join(APP_DIRECTORY, '__app/bundle-basic.css'),
-    path.join(APP_DIRECTORY, '__app/global.css')
+    path.join(APP_DIRECTORY, APP_LOCAL_DIRECTORY, 'album-app.js'),
+    path.join(APP_DIRECTORY, APP_LOCAL_DIRECTORY, 'album-basic.js'),
+    path.join(APP_DIRECTORY, APP_LOCAL_DIRECTORY, 'bundle.css'),
+    path.join(APP_DIRECTORY, APP_LOCAL_DIRECTORY, 'bundle-basic.css'),
+    path.join(APP_DIRECTORY, APP_LOCAL_DIRECTORY, 'global.css')
 ];
 
 const checkFile = path => {
@@ -40,12 +39,10 @@ const checkFile = path => {
     }
 };
 
-
-const checkStructure = (successCallback, init) => {
-
+const checkStructureInit = successCallback => {
     const errors = [];
 
-    for (const directory of (init ? initDirectories : directories)) {
+    for (const directory of initDirectories) {
         if (!checkFile(directory)) {
             errors.push('DIRECTORY: ' + directory + '  NOT FOUND');
         }
@@ -61,14 +58,52 @@ const checkStructure = (successCallback, init) => {
         for (const errorMsg of errors) {
             console.log(errorMsg);
         }
-        console.log(' ');
-        console.log('Are you in the /kaboom/ directory root?');
-        console.log(' ');
         process.exit(1);
     } else {
+        console.log('checkStructure FINISHED');
         if (successCallback) { successCallback(); }
     }
 
 };
 
-module.exports = checkStructure;
+const checkStructure = successCallback => {
+    const errors = [];
+
+    for (const directory of directories) {
+        if (!checkFile(directory)) {
+            errors.push('DIRECTORY: ' + directory + '  NOT FOUND');
+        }
+    }
+
+    for (const file of files) {
+        if (!checkFile(file)) {
+            errors.push('FILE:      ' + file + '  NOT FOUND');
+        }
+    }
+
+    if (errors.length) {
+        for (const errorMsg of errors) {
+            console.log(errorMsg);
+        }
+        if (!checkFile(GALLERY_MAIN_PATH) && errors.length === 1) {
+            console.log(' ');
+            console.log('From the /kaboom/ directory root,');
+            console.log('Run "kaboom init" to set up the ' + GALLERY_MAIN_PATH + ' directory.');
+            console.log('This set up the ' + GALLERY_MAIN_PATH + ' directory.');
+            console.log(' ');
+        }
+
+        process.exit(1);
+    } else {
+
+        console.log('checkStructure FINISHED');
+
+        if (successCallback) { successCallback(); }
+    }
+
+};
+
+module.exports = { 
+    checkStructure,
+    checkStructureInit
+};

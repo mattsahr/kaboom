@@ -3,7 +3,8 @@ const path = require( 'path' );
 const { 
     ALBUM_EXTRA_JSON,
     ALBUM_META_JSON, 
-    GALLERY_ACTIVE_PATH 
+    GALLERY_IS_HOME_PAGE,
+    GALLERY_MAIN_PATH
 } = require('../constants.js');
 
 const saveAlbum = (() => {
@@ -13,21 +14,23 @@ const saveAlbum = (() => {
         '11-plus': ALBUM_EXTRA_JSON
     };
 
-    return async (data, section, errCallback) => {
+    return async (data, section, source, errCallback) => {
 
 
-        const albumPath = path.join(GALLERY_ACTIVE_PATH, data.url);
+        const albumPath = data[GALLERY_IS_HOME_PAGE]
+            ? GALLERY_MAIN_PATH
+            : path.join(GALLERY_MAIN_PATH, source || '');
         const stat = await fs.promises.stat(albumPath);
 
         if (stat.isDirectory()) { 
 
-            const filePath = path.join(GALLERY_ACTIVE_PATH, data.url, fileNames[section]);
+            const filePath = path.join(albumPath, fileNames[section]);
             const json = JSON.stringify(data);
 
             fs.writeFile(
                 filePath, 
                 json, 
-                (err) => { if (err) { errCallback(err); } }
+                err => { if (err) { errCallback(err); } }
             );
 
         } else {

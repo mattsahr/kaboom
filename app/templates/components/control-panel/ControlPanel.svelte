@@ -1,6 +1,7 @@
 <script>
     import { fly } from 'svelte/transition';
     import MdList from 'svelte-icons/md/MdList.svelte';
+    import { GALLERY_IS_HOME_PAGE } from '../../utility/constants';
     import GalleryStore from '../../store/store';
     import Flatpickr from 'svelte-flatpickr/src/Flatpickr.svelte';
     import Tags from "svelte-tags-input";
@@ -22,6 +23,21 @@
     const onToggle = () => {
         GalleryStore.toggleControlPanel();
     };
+
+    const updateHeader = (() => {
+        let headerDiv = null;
+
+        return () => {
+            const { title, subtitle_A, subtitle_B } = $GalleryStore;
+            const titleString = title + 
+                ((subtitle_A || subtitle_B) ? ' | ' : '') + 
+                (subtitle_A || subtitle_B || '');
+
+            document.title = titleString;
+            headerDiv = headerDiv || document.querySelector('.page-header-title');
+            headerDiv.innerHTML = titleString;
+        };
+    })();
 
     const getDate = store => {
         const date = store.date;
@@ -52,7 +68,10 @@
     let dValue, formattedValue, flatpickr;
 
     $: open = refreshOpen($GalleryStore);
-    $: controlPanelClass = 'control-panel' + (open ? ' open' : '');
+    $: isHomePage = $GalleryStore[GALLERY_IS_HOME_PAGE];
+    $: controlPanelClass = 'control-panel' + 
+        (isHomePage ? ' home-page': '') +
+        (open ? ' open' : '');
     $: dateValue = getDate($GalleryStore);
     $: navCategories = $GalleryStore.navCategories || [];
     $: masterCategories = refreshCategories($GalleryStore);
@@ -81,6 +100,7 @@
     */
 
     const onPanelBlur = () => {
+        updateHeader();
         GalleryStore.updateMeta({ date: dateValue, navCategories });
     };
 
@@ -107,7 +127,7 @@
                     bind:value={$GalleryStore.subtitle_A}>
             </div>
 
-            <div class="entry-block">
+            <div class={'entry-block' + (isHomePage ? ' hidden': '')}>
                 <label for="gallery-date">Date</label>
                 <Flatpickr name="date" 
                     options={flatpickrOptions}
@@ -130,10 +150,12 @@
             </div>
 
 
-            <div class="entry-block double">
-                 <label for="gallery-nav-categories">Nav Categories</label>
-                 <Tags tags={navCategories} autoComplete={masterCategories} on:tags={changeTags} />
-            </div>
+            {#if !isHomePage}
+                <div class="entry-block double">
+                     <label for="gallery-nav-categories">Nav Categories</label>
+                     <Tags tags={navCategories} autoComplete={masterCategories} on:tags={changeTags} />
+                </div>
+            {/if}
 
         </div>
     {/if}
@@ -183,6 +205,10 @@
         overflow: visible;
     }
 
+    .control-panel.home-page.open {
+        height: 186px;
+    }
+
 
     .control-panel-frame {
         padding: 30px 0 0 0;
@@ -200,6 +226,11 @@
         display: flex;
         justify-content: flex-end;
         margin: 0 0 16px 0;
+    }
+
+    .entry-block.hidden {
+        opacity: 0;
+        pointer-events: none;
     }
 
     .entry-block.wide {

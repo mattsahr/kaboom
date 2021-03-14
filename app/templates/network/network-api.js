@@ -1,6 +1,50 @@
 const networkAPI = (() => {
 
     const saveURL = '/save-album';
+    const navSaveURL = '/save-nav';
+    const deleteURL = '/delete-image';
+
+    const deleteAPI = (() => {
+        async function deleteItem(url = '') {
+            const handleResponse = response => {
+                if (response.status === 204) {
+                    return 'SUCCESS';
+                } else {
+                    return 'ERROR: ' + response.status;
+                }
+            };
+
+            // Default options are marked with *
+            const response = await fetch(
+                url, 
+                {
+                    method: 'DELETE',
+                    mode: 'same-origin',
+                    cache: 'no-cache',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    redirect: 'follow',
+                    referrerPolicy: 'no-referrer'
+                }
+            );
+            return handleResponse(response);
+        }
+
+        return fileName => {
+
+            const path = window.location.pathname.split('/').filter(next => next).pop() || '';
+            deleteItem(deleteURL + '?image=' + fileName + '&source=' + path)
+                .then(response => response)
+                .catch(err => {
+                    console.groupCollapsed('NETWORK ERROR ' + deleteURL + ' | ' + fileName);
+                    console.log(err);
+                    console.groupEnd();
+                });
+        };
+
+    })();
 
     const saveAPI = (() => {
     
@@ -14,39 +58,56 @@ const networkAPI = (() => {
             };
 
             // Default options are marked with *
-            const response = await fetch(url, {
-                method: 'PATCH', // *GET, POST, PUT, DELETE, etc.
-                mode: 'same-origin', // no-cors, *cors, same-origin
-                cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
-                credentials: 'same-origin', // include, *same-origin, omit
-                headers: {
-                    'Content-Type': 'application/json'
-                    // 'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                redirect: 'follow', // manual, *follow, error
-                referrerPolicy: 'no-referrer', // no-referrer, *no-referrer-when-downgrade, origin, origin-when-cross-origin, same-origin, strict-origin, strict-origin-when-cross-origin, unsafe-url
-                body: JSON.stringify(data) // body data type must match "Content-Type" header
-            });
+            const response = await fetch(
+                url, 
+                {
+                    method: 'PATCH',
+                    mode: 'same-origin',
+                    cache: 'no-cache',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    redirect: 'follow',
+                    referrerPolicy: 'no-referrer',
+                    body: JSON.stringify(data)
+                }
+            );
             return handleResponse(response);
-            // return response.json();
         }
 
-        return (data, section) => {
-            postData(saveURL + '?section=' + section, data)
-                .then(response => {
-                    console.groupCollapsed('SAVE RESPONSE ' + section);
-                    console.log('data', data);
-                    console.log('response', response);
-                    console.groupEnd();
-                }).catch(err => {
-                    console.groupCollapsed('NETWORK ERROR ' + section);
-                    console.log(err);
-                    console.groupEnd();
-                });
+        return (data, section, nav) => {
+            if (nav){
+
+                postData(navSaveURL, data)
+                    .then(response => response)
+                    .catch(err => {
+                        console.groupCollapsed('NAV NETWORK ERROR');
+                        console.log(err);
+                        console.groupEnd();
+                    });
+
+            } else {
+
+                const path = window.location.pathname.split('/').filter(next => next).pop() || '';
+                postData(saveURL + '?section=' + section + '&source=' + path, data)
+                    .then(response => response)
+                    .catch(err => {
+                        console.groupCollapsed('NETWORK ERROR ' + section);
+                        console.log(err);
+                        console.groupEnd();
+                    });
+
+            }
+
         };
 
     })(); 
 
+
+    const saveNav = data => {
+        saveAPI(data, null, 'nav');
+    };
 
     const save = data => {
 
@@ -76,16 +137,19 @@ const networkAPI = (() => {
             count++;
         }
 
-        console.log('1-to-10 | ', albumTo10.images.length);
-        console.log('11-plus | ', album11Plus.images.length);
-
         saveAPI(albumTo10, '1-to-10');
         saveAPI(album11Plus, '11-plus');
 
     };
 
+    const deleteImage = fileName => {
+        deleteAPI(fileName);
+    };
+
     return {
-        save
+        deleteImage,
+        save,
+        saveNav
     };
 })(); 
 

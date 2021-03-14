@@ -1,9 +1,13 @@
     <script type="text/javascript">
         "use strict";
 
-        var APP_FILE_NAME = '__app_file_name__';
-
         (function() {
+
+            var APP_FILE_NAME = '__app_file_name__';
+            var NAV_APP_FILE_NAME = '__nav_app_file_name__';
+            var NAV_META_FILE_NAME = '__nav_meta_file_name__';
+            var NAV_ROOT_URL = '__nav_root_url__';
+
             var composeStartCache = function(appName) {
                 var cache = {};
 
@@ -72,9 +76,10 @@
             };
 
             var loadNavData = function () {
-                makeRequest('GET', '../nav-meta.json')
+                makeRequest('GET', NAV_META_FILE_NAME)
                     .then(function (data) {
                         var navData = JSON.parse(data);
+                        navData.navRoot = NAV_ROOT_URL;
                         navstart('data')(navData);
                     })
                     .catch(function (err) {
@@ -98,7 +103,7 @@
 
             var loadNav =function () {
                 loadNavData();
-                loadScript('../nav-app.js', navstart('app'));
+                loadScript(NAV_APP_FILE_NAME, navstart('app'));
             }
 
             loadApp();

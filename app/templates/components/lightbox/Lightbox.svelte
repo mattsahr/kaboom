@@ -273,7 +273,7 @@
 
                 {#if $GalleryStore.allowDownloads}
                     <a class="download-button" 
-                        href={'__original/' + imgData.fileName} 
+                        href={'++original/' + imgData.fileName} 
                         download={imgData.fileName} >
                             Download
                             <IconChevronRight />

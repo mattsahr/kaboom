@@ -4,7 +4,7 @@
     import GalleryImage from './GalleryImage.svelte';
     import GalleryDescription from './GalleryDescription.svelte';
     import Settings from './GalleryItemSettings.svelte';
-    import UnHideButton from './UnHideButton.svelte';
+    import UnHideButton from '../buttons/UnHideButton.svelte';
     import MdExpandLess from 'svelte-icons/md/MdExpandLess.svelte';
     import MdExpandMore from 'svelte-icons/md/MdExpandMore.svelte';
 
@@ -13,6 +13,8 @@
     export let hideItem = false;
     export let setPromo = false;
     export let unhideItem = false;
+    export let deleteItem = false;
+    export let isHomePage = false;
     export let viewLightbox = () => false;
     export let updateDescription = () => false;
     export let updatePromoDescription = () => false;
@@ -31,7 +33,7 @@
 
 <div class={frameClass}>
     {#if hideItem}
-        <Settings {hideItem} {imgData} {setPromo} />
+        <Settings {hideItem} {imgData} {setPromo} {deleteItem} {isHomePage} />
     {/if}
 
     {#if unhideItem}
@@ -43,7 +45,7 @@
     </Intersector>
 
     {#if mode !== 'arrange'}
-        <GalleryDescription {imgData} 
+        <GalleryDescription {imgData} {isHomePage}
             {updateDescription} />
     {/if}
 
@@ -57,7 +59,8 @@
             <GalleryDescription {imgData} isPromo="isPromo"
                 updateDescription={updatePromoDescription} />
         </div>
-    {/if}
+    {/if}   
+    
 
 </div>
 
@@ -133,7 +136,7 @@
         .photo-frame {
             flex-wrap: wrap;
             padding: 20px 10px 10px 10px;
-            margin: 0;
+            margin: 0 0 32px 0;
         }
         .promo-description {
             left: 20px;

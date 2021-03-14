@@ -18,8 +18,6 @@
 
     const handleChange = function(newValue) {
         
-        console.log('handleChange', newValue);
-
         if (!isControlled) {
             if (newValue === $selected) {
                 selected.set('');    

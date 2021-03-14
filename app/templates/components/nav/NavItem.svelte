@@ -1,15 +1,22 @@
 <script>
     export let item = {};
     export let custom = {};
+    export let bareLink = false;
 
     const getRoot = () => (window.NAV_DATA && window.NAV_DATA.NAV_ROOT) || '../';
 
+    $: link = custom.noLink 
+        ? ''
+        : bareLink
+            ? item.url
+            : custom.url || (getRoot() + item.url);
+    
 </script>
 
 <!-- ====================================== HTML =============================================== -->
 
 <a class={'nav-item' + (custom.className ? ' ' + custom.className : '')}
-    href={custom.noLink ? '' : custom.url || (getRoot() + item.url)}
+    href={link}
     title={custom.title ? custom.title : '/' + item.url}>
 
     <div class="nav-title">{custom.title || item.title}</div>
@@ -45,10 +52,12 @@
     }
 
     .nav-item.current, .nav-item-current:hover {
+        cursor: default;
         background: rgb(255, 255, 255);
         padding: 14px 18px 18px 12px;
         border-bottom-width: 1px;
         border-left: solid 6px rgb(0, 255, 0);
+        pointer-events: none;
     }
 
     .nav-title {

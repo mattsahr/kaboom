@@ -7,13 +7,17 @@
 
     <title>ALBUM!</title>
 
-    <link rel='icon' type='image/png' href='/favicon.png'>
+    <link rel='icon' type='image/png' href='../favicon.png'>
     <script type="text/javascript">
         "use strict";
 
-        var APP_FILE_NAME = '__app/album-app.js';
-
         (function() {
+
+            var APP_FILE_NAME = '++app/album-app.js';
+            var NAV_APP_FILE_NAME = '../nav-app.js';
+            var NAV_META_FILE_NAME = '../nav-meta.json';
+            var NAV_ROOT_URL = '../';
+
             var composeStartCache = function(appName) {
                 var cache = {};
 
@@ -82,9 +86,10 @@
             };
 
             var loadNavData = function () {
-                makeRequest('GET', '../nav-meta.json')
+                makeRequest('GET', NAV_META_FILE_NAME)
                     .then(function (data) {
                         var navData = JSON.parse(data);
+                        navData.navRoot = NAV_ROOT_URL;
                         navstart('data')(navData);
                     })
                     .catch(function (err) {
@@ -108,7 +113,7 @@
 
             var loadNav =function () {
                 loadNavData();
-                loadScript('../nav-app.js', navstart('app'));
+                loadScript(NAV_APP_FILE_NAME, navstart('app'));
             }
 
             loadApp();
@@ -161,7 +166,7 @@
             height: 36px;
         }
         h1.page-header-title {
-            font-size: 1.6em;
+            font-size: 1.4em;
             margin: 0 0 0 50px;
             font-weight: normal;
             padding: 6px 0 0 0;
@@ -241,11 +246,11 @@
     <script type="text/javascript">
         "use strict";
 
-        var MAIN_CSS_URL = '__app/bundle.css';
-        var GLOBAL_CSS_URL = '__app/global.css';
-        var NAV_CSS_URL = '../bundle-nav.css';
-
         (function(){
+
+            var MAIN_CSS_URL = '++app/bundle.css';
+            var GLOBAL_CSS_URL = '++app/global.css';
+            var NAV_CSS_URL = '../bundle-nav.css';
 
             var requiredCSS = ['app'];
             var allArrived = false;

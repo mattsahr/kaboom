@@ -1,0 +1,33 @@
+{
+    "title": "Photozz",
+    "subtitle_A": "/src/dummy/site-config.json",
+    "subtitle_B": "overwrite in the root /kaboom/ directory.",
+    "siteLink": "<a href='https://awsum.ninja'>Awsum Ninja</a>",
+
+    "custom_nav": {
+        "homeButton": "standard",
+        "homeCustom": {
+            "title": "Back to Main Site",
+            "subtitle_A": "http://example.com",
+            "url": "../"
+        },
+        "homeRedirect": "demo-album",
+        "bottomLinks": {
+            "category": "Related Sites",
+            "links": [
+                {
+                    "title": "Kaboom Project",
+                    "subtitle_A": "Github",
+                    "url": "https://github.com/mattsahr/kaboom"
+                },
+                {
+                    "title": "Another Rando Link",
+                    "subtitle_A": "edit /src/site-config.json",
+                    "url": "https://example.com"
+                }
+            ]
+        }
+    },
+
+    "notes": "Put a 'site-config.json' file in your /kaboom/src/ directory with real values."
+}

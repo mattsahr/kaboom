@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { writable } from "svelte/store";
     import { ORPHAN_CATEGORY } from './components/nav/nav-constants';
+    import HomeButton from './components/nav/HomeButton.svelte';
     import NavStore from './store/nav-store';
     import NavGroups from './components/nav/NavGroups.svelte';
     import NavList from './components/nav/NavList.svelte';
@@ -13,8 +14,8 @@
         getList, 
         sortMethods 
     } from './components/nav/nav-helpers';
+    import { GALLERY_IS_HOME_PAGE } from './utility/constants';
 
-    const custom = {};
     const dom = {};
     const active = writable(null);
     const orderType = writable('group');
@@ -23,6 +24,7 @@
 
     let current;
     let categories = [];
+    const bottomGroup = {};
 
     const updateMeta = (() => {
         const getMethodName = () => {
@@ -50,15 +52,15 @@
         return 'nav-sidebar' + (activeState ? ' active': '');
     };
 
+    const ACTIVE = window.Network && window.Network.saveNav;
+
     $: navList = getList($NavStore.albums, $sortDirection, $activeSort, current, $orderType, $active);
+    $: noHome = Boolean($NavStore.homeButton === 'none');
+    $: atHome = Boolean($NavStore[GALLERY_IS_HOME_PAGE]);
+    // $: homeClass =  atHome ? 'current' : '';
     $: currentItem = $NavStore.albums.find(next => next.url === current);
     $: navGroups = composeNavGroups(navList, categories);
     $: sidebarClass = getSidebarClass($active);
-    $: homeItem = {
-        title: 'Home',
-        className: 'home', 
-        url: '../'
-       };
 
     const toggleNav = () => {
         if (!$active) {
@@ -76,10 +78,21 @@
             categories.push(ORPHAN_CATEGORY);
         }
 
+        bottomGroup.category = ($NavStore.bottomLinks || {}).category;
+        bottomGroup.links = ($NavStore.bottomLinks || {}).links;
+
         activeSort.set(sortMethods[$NavStore.sortMethod] || sortMethods.date); 
         orderType.set($NavStore.orderType || 'group');
         sortDirection.set($NavStore.sortDirection || 'ascending');
 
+        console.group('Nav Init!');
+        console.log('current', current);
+        console.log('categories', categories);
+        console.log('NAV-DATA', window.NAV_DATA);
+        console.log('$NavStore', $NavStore);
+        console.log('$sortDirection', $sortDirection);
+        console.log('$active >>', $active);
+        console.groupEnd();
     };
 
     const initNavButton = () => {
@@ -101,24 +114,28 @@
 <div class={sidebarClass} bind:this={dom.sidebar}>
     {#if $active}
 
-        <NavItem item={homeItem} {custom} />
+        <HomeButton />
 
-        {#if currentItem !== homeItem}
-            <NavItem custom ={{className: 'current'}} item={currentItem} />
+        {#if !atHome}
+            <NavItem custom={{className: 'current'}} item={currentItem} />
         {/if}
 
-        <ListSwitcher 
-            {orderType} 
-            {sortDirection} 
-            {sortMethods} 
-            {activeSort}
-            {updateMeta} />
+        {#if ACTIVE}
+            <ListSwitcher 
+                {orderType} 
+                {sortDirection} 
+                {sortMethods} 
+                {activeSort}
+                {updateMeta} />
+        {/if}
 
         {#if $orderType === 'group'}
-            <NavGroups {navGroups} />
+            <NavGroups {atHome} {noHome} {navGroups} {bottomGroup} />
         {:else}
-            <NavList {navList} />
+            <NavList {atHome} {noHome} {navList} {bottomGroup} />
         {/if}
+
+
 
     {/if}
 </div>
@@ -155,6 +172,14 @@
         overflow-y: auto;
         width: 100%;
         padding: 0 0 32px 0;
+    }
+
+    :global(.nav-list.at-home) {
+        top: 51px;
+    }
+
+    :global(.nav-list.no-home) {
+        top: 54px;
     }
 
     .nav-sidebar.active {

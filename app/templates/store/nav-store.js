@@ -1,5 +1,7 @@
 import { writable } from 'svelte/store';
 
+const ACTIVE = window.Network && window.Network.saveNav;
+
 const createNavStore = () => {
     const { subscribe, set, update } = writable ({
         leftover: 'LEFTOVERZZ',        
@@ -9,6 +11,13 @@ const createNavStore = () => {
     let STORE;
     subscribe(store => STORE = store);
 
+    const save = () => {
+        setTimeout(() => {
+            if (ACTIVE) {
+                window.Network.saveNav(STORE);
+            }
+        }, 50);
+    };
 
     const updateMeta = newStuff => {
         const updated = {
@@ -16,9 +25,9 @@ const createNavStore = () => {
             ...newStuff
         };
 
-        set(updated);
+        set(updated); save();
 
-        console.log('STORE updateMeta', newStuff);
+        console.log('Nav Store Updated', updated);
     };
 
     return {
@@ -33,4 +42,5 @@ const createNavStore = () => {
 
 
 const NavStore = createNavStore();
+
 export default NavStore;

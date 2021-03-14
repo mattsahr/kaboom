@@ -2,11 +2,14 @@
 	import Lightbox from './components/lightbox/Lightbox.svelte';
 	import ControlPanel from './components/control-panel/ControlPanel.svelte';
 	import Column from './components/columns/ColumnDragDrop.svelte';
+    import Modal from 'svelte-simple-modal';
 </script>
 
 <main>
 	<ControlPanel />
-	<Column />
+	<Modal>
+		<Column />
+	</Modal>
 	<Lightbox />
 </main>
 

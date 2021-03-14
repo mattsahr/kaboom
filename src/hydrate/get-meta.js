@@ -1,67 +1,76 @@
+const axios = require('axios');
 const fs = require( 'fs' );
 const path = require( 'path' );
 const { checkFile } = require('../helpers/helpers.js');
+const { 
+    ALBUM_META_JSON,
+    ALBUM_EXTRA_JSON
+    // GALLERY_MAIN_PATH,
+    // GALLERY_IS_HOME_PAGE
+} = require('../constants.js');
+
+const getRemote = async url => {
+    try {
+        const res = await axios.get(url);
+        return res.data;
+    } catch (err) {
+        return false;
+    }
+};
+
+const getAlbum10 = async(albumDirectory, remoteURL) => {
+    if (remoteURL) {
+        const localDir = albumDirectory.split(path.sep).pop();
+        return getRemote(remoteURL + '/' + localDir + '/' + ALBUM_META_JSON);
+    } else {
+        const meta10Path = path.join(albumDirectory, ALBUM_META_JSON);
+        const gotAlbum10 = checkFile(meta10Path);
+        if (gotAlbum10) {
+            const album10 = await fs.promises.readFile(meta10Path, 'utf8');
+            return JSON.parse(album10);
+        }
+        return false;
+    }
+};
+
+const getAlbum11 = async(albumDirectory, remoteURL) => {
+    if (remoteURL) {
+        const localDir = albumDirectory.split(path.sep).pop();
+        return getRemote(remoteURL + '/' + localDir + '/' + ALBUM_EXTRA_JSON);
+    } else {
+        const meta11Path = path.join(albumDirectory, ALBUM_EXTRA_JSON);
+        const gotAlbum11 = checkFile(meta11Path);
+        if (gotAlbum11) {
+            const album11 = await fs.promises.readFile(meta11Path, 'utf8');
+            return JSON.parse(album11);
+        }
+        return false;
+    }
+};
+
 
 const getMeta = (() => {
 
-    const baseAlbum = albumDirectory => ({
+    const baseAlbum = (/*albumDirectory*/) => ({
         images: [],
-        svgSequences: {},
-        url: path.basename(albumDirectory) // albumDirectory.split('\\').pop()
+        svgSequences: {}
+        // url: albumDirectory === GALLERY_MAIN_PATH
+        //     ? GALLERY_HOME_PAGE_CONSTANT
+        //     : albumDirectory.split(path.sep).pop()
     });
 
-    return async albumDirectory => {
-        let albumMeta = baseAlbum(albumDirectory);
-        const metaPath = path.join(albumDirectory, 'album-meta.json');
+    return async (albumDirectory, remoteURL) => {
+        let albumMeta = baseAlbum(/*albumDirectory*/);
 
-        const gotAlbumMeta = checkFile(metaPath);
+        const album10 = await getAlbum10(albumDirectory, remoteURL);
+        const album11 = await getAlbum11(albumDirectory, remoteURL);
 
-        if (gotAlbumMeta) {
-            albumMeta = await fs.promises.readFile(metaPath, 'utf8');
-            albumMeta = JSON.parse(albumMeta);
-
-            albumMeta.url = path.basename(albumDirectory); // albumDirectory.split('/').pop();
-
-            albumMeta.svgSequences = albumMeta.svgSequences || {};
-
-            // clean up old style embedded sequence
-            // TODO -- REMOVE THIS LOOP
-            for (const image of albumMeta.images) {
-                if (image.svgSequence) { 
-                    albumMeta.svgSequences[image.fileName] = image.svgSequence;
-                    delete image.svgSequence;
-                }
-            }
-
+        if (album10) {
+            albumMeta = album10;
         } 
 
-        const meta10Path = path.join(albumDirectory, 'album-1-to-10.json');
-        const meta11Path = path.join(albumDirectory, 'album-11-plus.json');
-        
-        const gotAlbum10 = checkFile(meta10Path);
-        const gotAlbum11 = checkFile(meta11Path);
-
-        if (gotAlbum10) {
-            albumMeta = await fs.promises.readFile(meta10Path, 'utf8');
-            albumMeta = JSON.parse(albumMeta);
-            albumMeta.url = path.basename(albumDirectory); // albumDirectory.split('/').pop();
-
-            albumMeta.svgSequences = albumMeta.svgSequences || {};
-
-            // clean up old style embedded sequence
-            // TODO -- REMOVE THIS LOOP
-            for (const image of albumMeta.images) {
-                if (image.svgSequence) { 
-                    albumMeta.svgSequences[image.fileName] = image.svgSequence;
-                    delete image.svgSequence;
-                }
-            }
-
-        } 
-
-        if (gotAlbum11) {
-            const meta11 = await fs.promises.readFile(meta11Path, 'utf8');
-            const { images, svgSequences } = JSON.parse(meta11);
+        if (album11) {
+            const { images, svgSequences } = album11;
             for (const image of images) {
                 if (!albumMeta.images.find(next => next.fileName === image.fileName)) {
                     delete image.svgSequence;

@@ -3,6 +3,7 @@ const path = require( 'path' );
 const Jimp = require('jimp');
 const saveMeta = require('./save-meta.js');
 const getMeta = require('./get-meta.js');
+const { DEFAULT_IMAGE_DIRECTORY } = require('../constants.js');
 const { replaceLastOrAdd } = require('../helpers/helpers.js');
 
 const endBracket = /\/>/g;
@@ -49,8 +50,10 @@ const hydrateJSON = async (albumDirectory, successCallback) => {
 
     const albumMeta = await getMeta(albumDirectory);
 
+    albumMeta.title = albumMeta.title || albumDirectory.split(path.sep).pop();
+
     const imageDirectory = path.join(albumDirectory, 'svg');
-    const originalDirectory = path.join(albumDirectory, '__original');
+    const originalDirectory = path.join(albumDirectory, DEFAULT_IMAGE_DIRECTORY);
     const imageNames = await fs.promises.readdir(imageDirectory);
     const total = imageNames.length;
     let count = 0;

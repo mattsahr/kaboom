@@ -34,8 +34,8 @@ export const sizeName = (size, name) => replaceExtension(name, '--' + size + '.j
 export const getSizedPath = (size, fileName, url) => 
     size === 'original' 
         ? url 
-            ? url + '/__original/' + fileName
-            : '__original/' + fileName
+            ? url + '/++original/' + fileName
+            : '++original/' + fileName
         : url
             ? url + '/' + size + '/' + replaceExtension(fileName, '--' + size + '.jpg')
             : size + '/' + replaceExtension(fileName, '--' + size + '.jpg');

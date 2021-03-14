@@ -5,18 +5,33 @@
 
     const custom = {};
     export let navGroups;
+    export let atHome;
+    export let noHome;
+    export let bottomGroup;
+
+    $: listClass = 'nav-list' + (atHome ? ' at-home' : '')  + (noHome ? ' no-home' : '');
+    $: bottomLinks = bottomGroup.links && bottomGroup.links.length
+        ? bottomGroup.links
+        : null;
+    $: bottomCategory = bottomGroup.category;  
 </script>
 
-
-<div class="nav-list" in:fade out:fade >
+<div class={listClass} in:fade out:fade >
     <Accordion>
         {#each navGroups as group(group.category)}
             <Accordion.Section title={group.category}>
                 {#each group.items as item(item.url)}
                     <NavItem {item} {custom} />
                 {/each}
-                </Accordion.Section>
+            </Accordion.Section>
         {/each}
+        {#if bottomLinks}
+            <Accordion.Section title={bottomCategory}>
+                {#each bottomLinks as item(item.url)}
+                    <NavItem {item} {custom} bareLink={true}  />
+                {/each}
+            </Accordion.Section>
+        {/if}
     </Accordion>
 </div>
 

@@ -1,9 +1,12 @@
 <script>
     export let hideItem;
+    export let deleteItem;
     export let imgData;
     export let setPromo;
-    import HideButton from './HideButton.svelte';
-    import PromoButton from './PromoButton.svelte';
+    export let isHomePage = false;
+    import HideButton from '../buttons/HideButton.svelte';
+    import DeleteButton from '../buttons/DeleteButton.svelte';
+    import PromoButton from '../buttons/PromoButton.svelte';
     import MdClose from 'svelte-icons/md/MdClose.svelte';
     import MdSettings from 'svelte-icons/md/MdSettings.svelte';
 
@@ -21,8 +24,13 @@
     <div class="button" on:click={onClick}>
         {#if active}<MdClose />{:else}<MdSettings />{/if}
     </div>
-    {#if active} 
+    {#if active && !isHomePage} 
         <PromoButton {setPromo} {imgData} />
+    {/if}
+    {#if active} 
+        <DeleteButton {deleteItem} {imgData} />
+    {/if}
+    {#if active} 
         <HideButton {hideItem} {imgData} />
     {/if}
 </div>
@@ -56,8 +64,5 @@
         opacity: 1;
         background-color: white;
     }
-
-
-
 
 </style>

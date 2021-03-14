@@ -1,1 +1,119 @@
-{"albums":[{"title":"Demo Album","subtitle_A":"YouBetcha","subtitle_B":"Awsumz","date":"2020 Oct 13","url":"demo-album","imageCount":4,"navCategories":[],"appActive":false},{"title":"India","subtitle_A":"Mahabalipuram","subtitle_B":"Nov 2018","date":"2018-11-01T00:00:00.000Z","url":"india-mahabs","imageCount":28,"navCategories":["India"],"appActive":false},{"title":"Ethiopia","subtitle_A":"Jan - Feb 2009","subtitle_B":"Jan - Feb 2009","date":"2009-01-01T00:00:00.000Z","url":"africa-ethiopia","navCategories":["Africa"],"appActive":false},{"title":"Kenya","subtitle_A":"Lamu Island","subtitle_B":"September 2007","date":"2007-09-01T00:00:00.000Z","url":"africa-kenya-lamu","navCategories":["Africa"],"appActive":false},{"title":"Kenya and Tanzania","subtitle_A":"Aug - Sep 2007","subtitle_B":"","date":"2007-08-01T00:00:00.000Z","url":"africa-kenya-tanz","navCategories":["Africa"],"appActive":false},{"title":"Ecuador","subtitle_A":"Aug 2009 - Feb 2010","subtitle_B":"","date":"2009-08-01T00:00:00.000Z","url":"americas-ecuador","navCategories":["Americas"],"appActive":false},{"title":"Ecuador","subtitle_A":"Black Sheep Inn","subtitle_B":"Sep 2009 - Feb 2010","date":"2009-09-01T00:00:00.000Z","url":"americas-ecuador-chugchilan","navCategories":["Americas"],"appActive":false},{"title":"Ecuador","subtitle_A":"Amazon - Rio Cuyabeno","subtitle_B":"December 2009","date":"2009-12-01T00:00:00.000Z","url":"americas-ecuador-cuyabeno","navCategories":["Americas"],"appActive":false},{"title":"Ecuador","subtitle_A":" Galapagos Islands","subtitle_B":"Feb 2010","date":"2010-02-01T00:00:00.000Z","url":"americas-ecuador-galapagos","navCategories":["Americas"],"appActive":false},{"title":"Ecuador","subtitle_A":"New Years Eve","subtitle_B":"2009 - 2010","date":"2009-12-01T00:00:00.000Z","url":"americas-ecuador-newyears","navCategories":["Americas"],"appActive":false},{"title":"Ecuador","subtitle_A":"Quito","subtitle_B":"Aug 2009 - Feb 2010","date":"2009-08-01T00:00:00.000Z","url":"americas-ecuador-quito","navCategories":["Americas"],"appActive":false},{"title":"Beijing, China : 2005","subtitle_A":"Beijing","subtitle_B":"Summer, 2005","date":"2005-06-01T00:00:00.000Z","url":"asia-beijing","navCategories":["Asia"],"appActive":false},{"title":"North Korea","subtitle_A":"North Korea: 2006","subtitle_B":"July, 2006","date":"2006-07-01T00:00:00.000Z","url":"asia-nkorea","navCategories":["Asia"],"appActive":false},{"title":"South Korea","subtitle_A":"South Korea: 2005 - 2006","subtitle_B":"Apr 2005 - Aug 2006","date":"2005-04-01T00:00:00.000Z","url":"asia-skorea","navCategories":["Asia"],"appActive":false},{"title":"Spain","subtitle_A":"Barcelona, Zaragoza, Bilbao","subtitle_B":"Apr 2018","date":"2018-03-01T00:00:00.000Z","url":"europe-spain","navCategories":["Europe"],"appActive":false},{"title":"Chennai","subtitle_A":"Ganesha Festival","subtitle_B":"Chennai, Sep 2018","date":"2018-09-01T00:00:00.000Z","url":"india-chennai-ganesha-fest","navCategories":["India"],"appActive":false},{"title":"Chennai","subtitle_A":"Market Walk","subtitle_B":"Sep 2018","date":"2018-09-01T00:00:00.000Z","url":"india-chennai-market-walk","navCategories":["India"],"appActive":false},{"title":"Aurangabad","subtitle_A":"Ellora and Ajanta Caves","subtitle_B":"Nov 2019","date":"2019-10-01T00:00:00.000Z","url":"india-ellora","navCategories":["India"],"appActive":false},{"title":"Oman","subtitle_A":"Nov 2008","subtitle_B":"","date":"2008-11-01T00:00:00.000Z","url":"middle-east-oman","navCategories":["Middle East"],"appActive":false},{"title":"Qatar","subtitle_A":"Sep 2008 - Jul 2009","subtitle_B":"","date":"2008-08-01T00:00:00.000Z","url":"middle-east-qatar","navCategories":["Middle East"],"appActive":false},{"title":"Cambodia, Thailand","subtitle_A":"Angkor Wat, Kho Tao","subtitle_B":"Mar 2006","date":"2006-03-01T00:00:00.000Z","url":"seasia-cambodia-1","navCategories":["Southeast Asia"],"appActive":false},{"title":"Cambodia Revisited","subtitle_A":"Angkor Wat","subtitle_B":"Jan 2008","date":"2008-01-01T00:00:00.000Z","url":"seasia-cambodia-2","navCategories":["Southeast Asia"],"appActive":false},{"title":"Cambodia via Motorbike","subtitle_A":"Mar 2008","subtitle_B":"","date":"2008-03-01T00:00:00.000Z","url":"seasia-cambodia-3","navCategories":["Southeast Asia"],"appActive":false},{"title":"Malaysia and Thailand","subtitle_A":"2006","subtitle_B":"","date":"2006-11-01T00:00:00.000Z","url":"seasia-malaysia-thailand","navCategories":["Southeast Asia"],"appActive":false},{"title":"Philippines","subtitle_A":"Jan 2008","subtitle_B":"","date":"2008-01-01T00:00:00.000Z","url":"seasia-philippines","navCategories":["Southeast Asia"],"appActive":false},{"title":"Singapore and Malaysia","subtitle_A":"Christmas 2005","subtitle_B":"","date":"2005-12-01T00:00:00.000Z","url":"seasia-singapore","navCategories":["Southeast Asia"],"appActive":false},{"title":"Suannica Photographicus","subtitle_A":"\"Sooey Brooey\"","subtitle_B":"","date":"2008-01-01T00:00:00.000Z","url":"seasia-suannica-photographicus","navCategories":["Southeast Asia"],"appActive":false},{"title":"Thailand and Laos","subtitle_A":"Sep 2008","subtitle_B":"","date":"2008-09-01T00:00:00.000Z","url":"seasia-thai-lao","navCategories":["Southeast Asia"],"appActive":false},{"title":"Vietnam","subtitle_A":"Vung Tau","subtitle_B":"Sep 2006 - Sep 2008","date":"2006-09-01T00:00:00.000Z","url":"vietnam","navCategories":["Southeast Asia"],"appActive":false},{"title":"Vietnam","subtitle_A":"Dalat","subtitle_B":"Jul 2007","date":"2007-07-01T00:00:00.000Z","url":"vietnam-dalat","navCategories":["Southeast Asia"],"appActive":false},{"title":"Vietnam","subtitle_A":"Ha Long Bay","subtitle_B":"Mar 2007","date":"2007-03-01T00:00:00.000Z","url":"vietnam-halong","navCategories":["Southeast Asia"],"appActive":false},{"title":"Vietnam","subtitle_A":"Hue","subtitle_B":"Jan 2007","date":"2007-01-01T00:00:00.000Z","url":"vietnam-hue","navCategories":["Southeast Asia"],"appActive":false},{"title":"Vietnam","subtitle_A":"Mekong River","subtitle_B":"2006 - 2008","date":"2006-11-01T00:00:00.000Z","url":"vietnam-mekong","navCategories":["Southeast Asia"],"appActive":false},{"title":"Vietnam","subtitle_A":"Ho Chi Minh City","subtitle_B":"2006 - 2008","date":"2006-11-01T00:00:00.000Z","url":"vietnam-saigon","navCategories":["Southeast Asia"],"appActive":false},{"title":"Vietnam","subtitle_A":"Sapa","subtitle_B":"Apr 2007","date":"2007-04-01T00:00:00.000Z","url":"vietnam-sapa","navCategories":["Southeast Asia"],"appActive":false}]}
+{
+  "homeButton": "none",
+  "homeCustom": {
+    "title": "Back to Main Site",
+    "subtitle_A": "edit /src/site-config.json",
+    "url": "../"
+  },
+  "homeRedirect": "demo-album",
+  "bottomLinks": {
+    "category": "Related Sites",
+    "links": [
+      {
+        "title": "Kaboom Project",
+        "subtitle_A": "Github",
+        "url": "https://github.com/mattsahr/kaboom"
+      },
+      {
+        "title": "Another Rando Link",
+        "subtitle_A": "edit /src/site-config.json",
+        "url": "https://example.com"
+      }
+    ]
+  },
+  "albums": [
+    {
+      "title": "Ethiopia",
+      "subtitle_A": "Jan - Feb 2009",
+      "subtitle_B": "Jan - Feb 2009",
+      "date": "2009-01-01T00:00:00.000Z",
+      "url": "africa-ethiopia",
+      "imageCount": 136,
+      "navCategories": [
+        "Africa"
+      ]
+    },
+    {
+      "title": "Kenya",
+      "subtitle_A": "Lamu Island",
+      "subtitle_B": "September 2007",
+      "date": "2007-09-01T00:00:00.000Z",
+      "url": "africa-kenya-lamu",
+      "imageCount": 176,
+      "navCategories": [
+        "Africa"
+      ]
+    },
+    {
+      "title": "Kenya and Tanzania",
+      "subtitle_A": "Aug - Sep 2007",
+      "subtitle_B": "",
+      "date": "2007-08-01T00:00:00.000Z",
+      "url": "africa-kenya-tanz",
+      "imageCount": 125,
+      "navCategories": [
+        "Africa"
+      ]
+    },
+    {
+      "title": "Ecuador",
+      "subtitle_A": "Aug 2009 - Feb 2010",
+      "subtitle_B": "",
+      "date": "2009-08-01T00:00:00.000Z",
+      "url": "americas-ecuador",
+      "imageCount": 41,
+      "navCategories": [
+        "Americas"
+      ]
+    },
+    {
+      "title": "Ecuador",
+      "subtitle_A": "Black Sheep Inn",
+      "subtitle_B": "Sep 2009 - Feb 2010",
+      "date": "2009-09-01T00:00:00.000Z",
+      "url": "americas-ecuador-chugchilan",
+      "imageCount": 95,
+      "navCategories": [
+        "Americas"
+      ]
+    },
+    {
+      "title": "Ecuador",
+      "subtitle_A": "Amazon - Rio Cuyabeno",
+      "subtitle_B": "December 2009",
+      "date": "2009-12-01T00:00:00.000Z",
+      "url": "americas-ecuador-cuyabeno",
+      "imageCount": 47,
+      "navCategories": [
+        "Americas"
+      ]
+    },
+    {
+      "title": "Ecuador",
+      "subtitle_A": " Galapagos Islands",
+      "subtitle_B": "Feb 2010",
+      "date": "2010-02-01T00:00:00.000Z",
+      "url": "americas-ecuador-galapagos",
+      "imageCount": 47,
+      "navCategories": [
+        "Americas"
+      ]
+    },
+    {
+      "title": "Ecuador",
+      "subtitle_A": "New Years Eve",
+      "subtitle_B": "2009 - 2010",
+      "date": "2009-12-01T00:00:00.000Z",
+      "url": "americas-ecuador-newyears",
+      "imageCount": 25,
+      "navCategories": [
+        "Americas"
+      ]
+    },
+    {
+      "title": "demo-album",
+      "url": "demo-album",
+      "imageCount": 4
+    }
+  ]
+}

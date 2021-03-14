@@ -1,5 +1,8 @@
 <script>
+    import AlbumLink from './AlbumLink.svelte';
+
     export let imgData = {};
+    export let isHomePage = false;
 
     $: descHtml = imgData.description || '';
 
@@ -8,7 +11,8 @@
 <!-- ====================================== HTML =============================================== -->
 
 
- <div class="description-block">
+<div class="description-block">
+    <AlbumLink {isHomePage} {imgData} />
     <div class="description">{@html descHtml}</div>
 </div>
 

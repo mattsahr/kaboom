@@ -1,8 +1,20 @@
 import GalleryStore from './store/store';
+import { GALLERY_IS_HOME_PAGE } from './utility/constants';
 
 const hydrateNavData = galleryData => {
     window.NAV_DATA = window.NAV_DATA || {};
-    window.NAV_DATA.currentURL = galleryData.url;
+    window.NAV_DATA.currentURL = galleryData.url = 
+        window.location.pathname.split('/').filter(next => next).pop();
+
+    if (galleryData[GALLERY_IS_HOME_PAGE]) {
+        window.NAV_DATA[GALLERY_IS_HOME_PAGE] = true;
+    }
+
+    console.group('hydrateNavData');
+    console.log('location path', window.location.pathname.split('/').filter(next => next).pop());
+    console.log('NAV_DATA', window.NAV_DATA);
+    console.log('galleryData', galleryData);
+    console.groupEnd();
 };
 
 const hydrateSvgSequence = (() => {

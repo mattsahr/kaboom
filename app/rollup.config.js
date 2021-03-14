@@ -34,15 +34,18 @@ const rollupApp = {
 	input: 'templates/album.js',
 	output: {
 		sourcemap: !production, format: 'iife', name: 'app',
-		file: 'pages/__app/album-app.js'
+		file: 'pages/++app/album-app.js'
 	},
 	plugins: [
 		svelte({ compilerOptions: { dev: !production } }),
 		css({ output: 'bundle.css' }),
-		resolve({ browser: true, dedupe: ['svelte'] }),
+		resolve({ 
+			browser: true, 
+			dedupe: ['svelte', 'svelte/transition', 'svelte/internal'] 
+		}),
 		commonjs(),
 		copy({ targets: [
-			{ src: 'base/global.css', dest: 'pages/__app/' }
+			{ src: 'base/global.css', dest: 'pages/++app/' }
 		] }),
 		!production && livereload('pages'),
 		production && terser()
@@ -54,7 +57,7 @@ const rollupBasic = {
 	input: 'templates/album-basic.js',
 	output: { 
 		sourcemap: !production, format: 'iife', name: 'basic',
-		file: 'pages/__app/album-basic.js'
+		file: 'pages/++app/album-basic.js'
 	},
 	plugins: [
 		svelte({ compilerOptions: { dev: !production } }),
@@ -62,7 +65,7 @@ const rollupBasic = {
 		resolve({ browser: true, dedupe: ['svelte'] }),
 		commonjs(),
 		copy({ targets: [
-			{ src: 'base/global-basic.css', dest: 'pages/__app/' }
+			{ src: 'base/global-basic.css', dest: 'pages/++app/' }
 		] }),
 		!production && livereload('pages'),
 		production && terser()
@@ -83,20 +86,70 @@ const rollupNav = {
 		commonjs(),
 		concatHTML({
 			replacements: {
-		        __app_file_name__: '__app/album-basic.js',
+		        __html_bundle_output__: 'basic.html',
+
+		        // basic files
+		        __app_file_name__: '++app/album-basic.js',
 		        __css_global_file_name__: '',
-		        __css_bundle_file_name__: '__app/bundle-basic.css',
+		        __css_bundle_file_name__: '++app/bundle-basic.css',
+
+		        // child-page specific locations
+		        __favicon_file_name__: '../favicon.png',
 		        __css_nav_file_name__: '../bundle-nav.css',
-		        __html_bundle_output__: 'basic.html'
+		        __nav_app_file_name__: '../nav-app.js',
+		        __nav_meta_file_name__: '../nav-meta.json',
+		        __nav_root_url__: '../'
 			}
 		}),
 		concatHTML({
 			replacements: {
-		        __app_file_name__: '__app/album-app.js',
-		        __css_global_file_name__: '__app/global.css',
-		        __css_bundle_file_name__: '__app/bundle.css',
+		        __html_bundle_output__: 'home-basic.html',
+
+		        // basic files
+		        __app_file_name__: '++app/album-basic.js',
+		        __css_global_file_name__: '',
+		        __css_bundle_file_name__: '++app/bundle-basic.css',
+
+		        // home-page specific locations
+		        __favicon_file_name__: 'favicon.png',
+		        __nav_app_file_name__: 'nav-app.js',
+		        __nav_meta_file_name__: 'nav-meta.json',
+		        __css_nav_file_name__: 'bundle-nav.css',
+		        __nav_root_url__: ''
+			}
+		}),
+		concatHTML({
+			replacements: {
+		        __html_bundle_output__: 'index.html',
+
+		        // active (full-edit app) files
+				__app_file_name__: '++app/album-app.js',
+		        __css_global_file_name__: '++app/global.css',
+		        __css_bundle_file_name__: '++app/bundle.css',
+
+		        // child-page specific locations
+		        __favicon_file_name__: '../favicon.png',
+		        __nav_app_file_name__: '../nav-app.js',
+		        __nav_meta_file_name__: '../nav-meta.json',
 		        __css_nav_file_name__: '../bundle-nav.css',
-		        __html_bundle_output__: 'index.html'
+		        __nav_root_url__: '../'
+			}
+		}),
+		concatHTML({
+			replacements: {  
+				__html_bundle_output__: 'home.html',
+
+		        // active (full-edit app) files
+		        __app_file_name__: '++app/album-app.js',
+		        __css_global_file_name__: '++app/global.css',
+		        __css_bundle_file_name__: '++app/bundle.css',
+
+		        // home-page specific locations
+		        __favicon_file_name__: 'favicon.png',
+		        __nav_app_file_name__: 'nav-app.js',
+		        __nav_meta_file_name__: 'nav-meta.json',
+		        __css_nav_file_name__: 'bundle-nav.css',
+		        __nav_root_url__: ''
 			}
 		}),
 		!production && serve(),

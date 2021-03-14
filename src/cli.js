@@ -85,11 +85,11 @@ const cli = args => {
             break;
 
         case 'compare':
-            deployCompare(option, test);
+            deployCompare(option, exitCallback);
             break;
 
         case 'add':
-            addAlbum(test);
+            addAlbum(exitCallback);
             break;
 
         case 'static':

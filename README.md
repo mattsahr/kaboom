@@ -422,5 +422,61 @@ The `/kaboom/src/site-config.json` has a section called `"bottomLinks"` where yo
     }
 }
 ```
+<p><br /></p>
 
+----
+
+<p><br /></p>
+
+<h4>Development</h4>
+
+The CLI parts of the project are in `/kaboom/src/`  
+The app parts of the project are in `/kaboom/app/`
+
+To develop or customize the app, install the svelte setup.
+
+```
+cd kaboom/app
+npm install
+npm run dev
+```
+
+This should start a server at `localhost:5000` that hot loads the svelte code.
+
+Most of the code is in `/kaboom/app/templates/`  
+Some of the framework stuff is in `/kaboom/app/base/`
+
+The svelte process builds into the `/kaboom/app/pages/` directory.  
+The `/localhost:5000` dev server finds its stuff in  `/kaboom/app/pages/`
+
+The kaboom CLI build processes pick up already-built files from `/kaboom/app/pages/` and copy them into the various directories in `/kaboom/gallery/`.
+
+There are actually 3 apps built by the svelte build process.
+
+```
+SOURCE  /kaboom/app/templates/Album.svelte
+BUILD   /kaboom/app/pages/++app/album-app.js
+
+SOURCE  /kaboom/app/templates/AlbumBasic.svelte
+BUILD   /kaboom/app/pages/++app/album-basic.js
+
+SOURCE  /kaboom/app/templates/Nav.svelte
+BUILD   /kaboom/app/pages/nav-app.js
+```
+
+These "album-basic.js" app is, generally, what you want to deploy.  While the "album-app.js" app is the one with all the on-page editors built in.
+
+There is nothing that dictates the "basic" app should look anything like the full app.  At the moment they look almost identical, but that's just me.  If you want to change the look and feel of the public-facing galleries -- mess around with the "basic" app.
+
+<p><br /></p>
+
+----
+
+<p><br /></p>
+
+<h4>To Do</h4>
+
+-- It is annoying, time-consuming, that when you want to just add a photo to an existing album, `kaboom add` re-runs the entire ingest process.
+
+-- The `site-config.json` file is fine, but it would be better if all that stuff was editable from inside the app.
 

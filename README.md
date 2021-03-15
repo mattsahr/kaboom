@@ -1,6 +1,6 @@
 # Kaboom.
 A small, fast, static site photo gallery.  Written in node.js and Svelte.  
-[Demo Gallery](https://mattsahr.github.io/kaboom-demo/)
+[Demo Gallery](https://mattsahr.github.io/kaboom-demo/kaboom-how-to/)
 
 **TLDR INSTALL**  
 install [Node](https://nodejs.org/)  
@@ -23,7 +23,7 @@ kaboom serve
 <h3 id="design-goals">DESIGN GOALS</h3>
 
 **Startup Bundle Size**  
-The gallery focuses on quick load & first-paint.  Total bundle size is under 50kB (gzipped) -- with inline images included.  That last bit -- inline images included -- is the kicker: delivering the first 10 browseable images, with a "zoom in" lightbox and description/captions, in under 50k.
+Kaboom focuses on quick load & fast startup.  Total bundle size is under 50kB (gzipped) -- with inline images included.  That last bit -- inline images included -- is the kicker: delivering the first 10 browseable images, with a "zoom in" lightbox and description/captions, in under 50kb.
 
 | Above the fold       |     raw     |       gzip   |      brotli   |
 |----------------------|------------:|-------------:|--------------:|
@@ -33,7 +33,7 @@ The gallery focuses on quick load & first-paint.  Total bundle size is under 50k
 |  album-1-to-10.json  |    30.9 kB  |     14.0 kB  |      11.2 kB  |
 |  **TOTAL**           | **94.9 kB** |  **37.6 kB** |  **30.2 kB**  |
 
-There are more files that load "below the fold", including the nav menu (JS and CSS), and images past the first 10 in an album.  But these below-the-fold files arrive in a second phase and shouldn't affect startup speed.  
+There are more files that load "below the fold", including the nav menu (JS and CSS), and images past the first 10 in an album.  These below-the-fold files arrive in a second phase and shouldn't affect startup speed.  
 
 | Below the fold       |     raw      |       gzip   |      brotli   |
 |----------------------|-------------:|-------------:|--------------:|

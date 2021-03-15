@@ -139,12 +139,12 @@ Running "kaboom init" will make a /gallery/ directory, just below the /kaboom/ d
 /kaboom/
     /gallery/
        /demo-album/
-          /++original/
-          -- kaboom_1_demo.png
-          -- kaboom_2_demo.jpg
-          -- kaboom_3_demo.jpeg
-          -- kaboom_4_demo.gif
-         favicon.png
+            /++original/
+             -- kaboom_1_demo.png
+             -- kaboom_2_demo.jpg
+             -- kaboom_3_demo.jpeg
+             -- kaboom_4_demo.gif
+        -- favicon.png
 ```
 
 The "init" command will then process these images and make various sized versions.   **NOTE** -- you must have **nconvert** and **primitive** installed for the "init" command to complete successfully.   

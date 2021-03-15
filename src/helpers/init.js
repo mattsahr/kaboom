@@ -1,58 +1,44 @@
 const path = require( 'path' );
-const replace = require('replace-in-file');
+const fs = require( 'fs' );
 const { copyFile } = require ('./helpers.js');
+const constantsSOURCE = require ('../dummy/constants.js');
 
-const doubleBackSlash = (() => {
-    const backSlash = /\\/g;
-    const tripleBackSlash = /\\\\\\/g;
-    return str => str.replace(backSlash, '\\\\').replace(tripleBackSlash, '\\\\');
-})(); 
 
 const init = async successCallback => {
 
-    const updateConstants = () => {
-        const constantsPath = path.join('src', 'constants.js');
-        const current = process.cwd();
+    const updateConstants = async () => {
 
-        const gallery = doubleBackSlash(path.join(current, 'gallery'));
-        const appPages = doubleBackSlash(path.join(current, 'app', 'pages'));
-        const dummy = doubleBackSlash(path.join(current, 'src', 'dummy'));
-        const urlsJson = doubleBackSlash(path.join(current, 'src', 'remote-urls.json'));
+        const constants = {...constantsSOURCE };
 
-        const options = {
-            files: constantsPath,
-            from: [
-                './gallery', './app/pages', './src/dummy', './src/remote-urls.json',
-                'DUMMY: true', 'SHOULD BE', 'COMMAND RUNS'
-            ],
-            to: [
-                gallery, appPages, dummy, urlsJson,
-                'PATHS_INITIALIZED: true', 'WERE', 'COMMAND WAS RUN'
-            ],
-            countMatches: true
+        delete constants.DUMMY;
+        constants.PATHS_INITIALIZED = true;
+
+        const dateOptions = {
+            weekday: 'short',
+            year: 'numeric',
+            month: 'short',
+            day: '2-digit'
         };
 
-        const results = replace.sync(options);
+        constants.INIT_STATUS = "UPDATED VIA 'kaboom init' -- " + 
+            new Date().toLocaleDateString("en-US", dateOptions);
 
-        if (results && results.length === 1) {
-            if (successCallback) { 
-                successCallback(); 
-            } else {
-                console.log(' ');
-                console.log('INIT SUCCESS');
-                console.log(' ');
-            }
+        const current = process.cwd();
 
-        } else {
-            console.log(' ');
-            console.log('INIT ERROR');
-            console.log(' ');
-            console.log('Constants were not updated');
-            console.log('update target: ', constantsPath);
-            console.log(' ');
-            process.exit(1);
+        constants.APP_DIRECTORY = path.join(current, 'app', 'pages');
+        constants.DUMMY_RESOURCE_PATH = path.join(current, 'src', 'dummy');
+        constants.REMOTE_URLS_JSON = path.join(current, 'src', 'remote-urls.json');
+        constants.GALLERY_MAIN_PATH = path.join(current, 'gallery');    
+
+        const fileString = 'module.exports = ' + JSON.stringify(constants, null, 4) + ';\n';
+        const constantsPath = path.join('src', 'constants.js');
+        await fs.promises.writeFile(constantsPath, fileString);
+
+        if (successCallback) {
+            successCallback();
         }
     };
+
 
     const copyFinal = copyError => {
         if (copyError) {
@@ -67,33 +53,10 @@ const init = async successCallback => {
         updateConstants();
     };
 
-/*
-    const copy3 = () => {
-        const source = 'src/dummy/site-config.json';
-        const target = 'src/site-config.json';
-        copyFile(source, target, copyFinal);
-    };
-
-    const copy2 = () => {
-        const source = 'src/dummy/constants.js';
-        const target = 'src/constants.js';
-        copyFile(source, target, copy3);
-    };
-
-    const copy1 = () => {
-        const source = 'src/dummy/remote-urls.json';
-        const target = 'src/remote-urls.json';
-        copyFile(source, target, copy2);
-    };
-*/
     const toCopy = [
         {
             source: 'src/dummy/site-config.json',
             target: 'src/site-config.json'
-        },
-        {
-            source: 'src/dummy/constants.js',
-            target: 'src/constants.js'
         },
         {
             source: 'src/dummy/remote-urls.json',
@@ -116,9 +79,6 @@ const init = async successCallback => {
     };
 
     copyNext();
-
-    // copy1();
-
 };
 
 module.exports = init;

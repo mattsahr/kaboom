@@ -15,7 +15,7 @@ module.exports = {
         'kaboom_4_demo.gif'
     ],
 
-    // THESE VALUES SHOULD BE UPDATED WHEN THE "kaboom init" CLI COMMAND RUNS
+    INIT_STATUS: 'THE VALUES BELOW SHOULD BE UPDATED WHEN THE "kaboom init" CLI COMMAND RUNS',
     APP_DIRECTORY: './app/pages',
     DUMMY_RESOURCE_PATH: './src/dummy',
     REMOTE_URLS_JSON: './src/remote-urls.json',

@@ -8,6 +8,7 @@ const {
     DUMMY_RESOURCE_PATH,
     GALLERY_IS_HOME_PAGE,
     GALLERY_MAIN_PATH,
+    NAV_META_JSON,
     SITE_CONFIG
 } = require('../constants.js');
 const getMeta =  require('./get-meta.js');
@@ -21,77 +22,67 @@ const reconcileHomePage = (() => {
         saveMeta(homePage, GALLERY_MAIN_PATH, successCallback);
     };
 
-    const updateImages = (() => {
+    // const updateImages = (() => {
 
-        const replace = (target, update, currentSequences, updateSequences) => {
+    //     const replace = (target, update, currentSequences, updateSequences) => {
 
-            delete currentSequences[target.fileName];
+    //         delete currentSequences[target.fileName];
 
-            for (const [key, value] of Object.entries(update)) {
-                target[key] = value;
-            }
+    //         for (const [key, value] of Object.entries(update)) {
+    //             target[key] = value;
+    //         }
 
-            currentSequences[update.fileName] = updateSequences[update.fileName];
+    //         currentSequences[update.fileName] = updateSequences[update.fileName];
 
-        };
+    //     };
 
-        return (page, candidate) => {
+    //     return (page, candidate) => {
 
-            const batch = page.images;
-            const updates = candidate.images;
+    //         for (const next of page.images) {
 
-            for (const next of updates) {
+    //             const current = batch.find(image => image.url === next.url);
 
-                const current = batch.find(image => image.url === next.url);
+    //             if (!current) {
+    //                 batch.push(next);
+    //                 page.svgSequences[next.fileName] = candidate.svgSequences[next.fileName];
+    //             } else {
+    //                 const shouldReplace = current.fileName !== next.fileName;
+    //                 if (shouldReplace) {
+    //                     replace(current, next, page.svgSequences, candidate.svgSequences);
+    //                 }
+    //             }
+    //         }
+    //     };
 
-                if (!current) {
-                    batch.push(next);
-                    page.svgSequences[next.fileName] = candidate.svgSequences[next.fileName];
-                } else {
-                    const shouldReplace = current.fileName !== next.fileName;
-                    if (shouldReplace) {
-                        replace(current, next, page.svgSequences, candidate.svgSequences);
-                    }
-                }
-            }
-        };
-
-    })(); 
+    // })(); 
  
-    const removeOrphanedImages = (page, candidate) => {
+    const removeOrphanedImages = async (page) => {
 
-        const batch = page.images;
-        const updates = candidate.images;
+        const names = await fs.promises.readdir(GALLERY_MAIN_PATH);
+        const albums = {};
+
+        for (const name of names.filter(notAppDir)) {
+            const albumPath = path.join(GALLERY_MAIN_PATH, name);
+            const stat = await fs.promises.stat(albumPath);
+            if (stat.isDirectory()) { albums[name] = true; }
+        }
+
         const confirmedImages = [];
 
-        for (const image of batch) {
-            const albumFound = updates.find(next => next.url === image.url);
-            if (albumFound) {
-                confirmedImages.push(image);
+        for (const image of page.images) {
+            if (!albums[image.url]) {
+                console.log('ORPHAN REMOVED', image.url);
+                delete page.svgSequences[image.id];
             } else {
-                delete page.svgSequences[image.fileName];
+                confirmedImages.push(image);
             }
         }
 
         page.images = confirmedImages;
     };
 
-    return async (newPage, successCallback) => {
-
-        const currentHomePage = await getMeta(GALLERY_MAIN_PATH);
-        const homePage = { ...newPage, ...currentHomePage };
-
-        console.log(' ');
-        console.log('update svgSequences');
-        for (const key of Object.keys(newPage.svgSequences)) {
-            console.log(key, newPage.svgSequences[key].length);
-        }
-        console.log(' ');
-
-        updateImages(homePage, newPage);
-
-        removeOrphanedImages(homePage, newPage);
-
+    return async (homePage, successCallback) => {
+        await removeOrphanedImages(homePage);
         saveHomepage(homePage, successCallback);
     };
 
@@ -224,6 +215,47 @@ const HomePage = (() => {
 })();
 
 
+const persistNav = (() => {
+
+    const navURL = path.join(GALLERY_MAIN_PATH, NAV_META_JSON);
+
+    const persistentProps = [ 
+        'orderType', 
+        'sortDirection', 
+        'navRoot', 
+        'sortMethod', 
+        'currentURL'
+    ];
+
+    const getCurrentNav = async () => {
+        let delivery;
+        try {
+            delivery = await fs.promises.readFile(navURL, 'utf8');
+            delivery = JSON.parse(delivery);
+        } catch (e) {
+            delivery = {};
+        }
+        return delivery;
+    };
+
+    return async navMeta => {
+        const currentNav = await getCurrentNav();
+
+        if (currentNav && currentNav.orderType) {
+            console.log(' ');
+            for (const prop of persistentProps) {
+                if (currentNav[prop]) {
+                    console.log('-- persist --', prop, currentNav[prop]);
+                    navMeta[prop] = currentNav[prop];
+                }
+            }
+            console.log(' ');
+        }
+    };
+
+})();
+
+
 
 const addNavItem = async (directory, navMeta, homePage) => {
 
@@ -304,16 +336,13 @@ const hydrateNavJSON = successCallback => async () => {
     config = JSON.parse(config);
 
     console.log('hydrateNavJSON');
-    console.log(config);
-    console.log(' ');
-    console.log('config customNav');
-    console.log(config.custom_nav);
-    console.log(' ');
 
     const navMeta = {
        ...(config.custom_nav || {}),
         albums: []
     };
+
+    await persistNav(navMeta);
 
     const homePage = await HomePage.get();
     homePage[GALLERY_IS_HOME_PAGE] = true;

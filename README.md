@@ -1,5 +1,6 @@
 # Kaboom.
-A small, fast, static site photo gallery.  Written in node.js and Svelte.
+A small, fast, static site photo gallery.  Written in node.js and Svelte.  
+[Demo Gallery](https://mattsahr.github.io/kaboom-demo/)
 
 **TLDR INSTALL**  
 install [Node](https://nodejs.org/)  
@@ -17,7 +18,7 @@ kaboom serve
 
 [Full Installation Guide](#installation)  
 
-<p><br /></p> 
+----
 
 <h3 id="design-goals">DESIGN GOALS</h3>
 
@@ -34,16 +35,16 @@ The gallery focuses on quick load & first-paint.  Total bundle size is under 50k
 
 There are more files that load "below the fold", including the nav menu (JS and CSS), and images past the first 10 in an album.  But these below-the-fold files arrive in a second phase and shouldn't affect startup speed.  
 
-| Below the fold       |     raw     |       gzip   |      brotli   |
-|----------------------|------------:|-------------:|--------------:|
-|  nav-app.js          |    32.6 kB  |     11.4 kB  |       9.5 kB  |
-|  bundle-nav.css      |     4.7 kB  |      2.0 kB  |       1.3 kB  |
-|  album-11-plus.json  |    53.8 kB  |     23.0 kB  |      18.9 kB  |
-|  **TOTAL**           | **91.1 kB** |  **36.4 kB** |  **29.7 kB**  |
+| Below the fold       |     raw      |       gzip   |      brotli   |
+|----------------------|-------------:|-------------:|--------------:|
+|  nav-app.js          |    32.6 kB   |     11.4 kB  |       9.5 kB  |
+|  bundle-nav.css      |     4.7 kB   |      2.0 kB  |       1.3 kB  |
+|  album-11-plus.json  |   223.2 kB   |     83.1 kB  |      75.9 kB  |
+|  **TOTAL**           | **260.5 kB** |  **96.5 kB** |  **85.7 kB**  |
 
 To some extent, your mileage will vary concerning the size of the `album-1-to-10.json` file.  It depends on how much description text you include.  If you write a novel to accompany each image, the JSON is going to get bigger.
 
-Similarly, size will vary quite a bit in the `album-11-plus.json` file.  It contains all the images past the first 10.  The estimate here is using a gallery with 30 total images, including two or three sentences of description with each.
+Similarly, size will vary quite a bit in the `album-11-plus.json` file.  It contains all the images past the first 10.  The estimate here is using a gallery with 84 total images, including two or three sentences of description with each.
 
 Finally, these number are only concerned with the inline place-holder images that get the page on its feet.  Once the browser starts pulling down the "real" images, bandwidth shoots up.  
 
@@ -160,6 +161,15 @@ kaboom serve
 In a web browser, browse to [http://localhost:4444](http://localhost:4444)
 
 At this point, on the web page, you should be able to click in the "Description" area of any image, and add text.  There will also be two icons at the top right of the page -- "metadata" and "arrange" buttons.
+
+---
+<p><br /></p> 
+
+<h3 id="editing">Editing</h3>
+
+Hopefully editing in the app is fairly easy to pick up from the UX.  There are some instructions on editing here:
+
+[https://mattsahr.github.io/kaboom-demo/](https://mattsahr.github.io/kaboom-demo/)
 
 ----
 <p><br /></p> 
@@ -442,6 +452,9 @@ npm run dev
 ```
 
 This should start a server at `localhost:5000` that hot loads the svelte code.
+
+The `npm run dev` is good for developing.  When you're happy with your changes,  
+run `npm run build` to bundle the app for wider use.
 
 Most of the code is in `/kaboom/app/templates/`  
 Some of the framework stuff is in `/kaboom/app/base/`

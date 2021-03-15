@@ -19,11 +19,6 @@
                     "title": "Kaboom Project",
                     "subtitle_A": "Github",
                     "url": "https://github.com/mattsahr/kaboom"
-                },
-                {
-                    "title": "Another Rando Link",
-                    "subtitle_A": "edit /src/site-config.json",
-                    "url": "https://example.com"
                 }
             ]
         }

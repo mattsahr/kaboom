@@ -4,6 +4,7 @@
     import GalleryDescriptionBasic from './GalleryDescriptionBasic.svelte';
 
     export let imgData;
+    export let isHomePage = false;
     export let viewLightbox = () => false;
 </script>
 
@@ -14,7 +15,7 @@
     <Intersector once={true} let:intersecting={intersecting}>
         <GalleryImage {viewLightbox} {imgData} show={intersecting} />
     </Intersector>
-    <GalleryDescriptionBasic {imgData} />
+    <GalleryDescriptionBasic {imgData} {isHomePage} />
 </div>
 
 

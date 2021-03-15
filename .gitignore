@@ -13,6 +13,7 @@ app/node_modules/
 
 ### Working Resources
 __resources/
+src/constants.js
 src/remote-urls.json
 
 ### App Build Files

@@ -136,15 +136,15 @@ kaboom init
 Running "kaboom init" will make a /gallery/ directory, just below the /kaboom/ directory.  it will then populate that /gallery/ with a directory called "demo-album"
 
 ```
-kaboom
- -- gallery
-    -- demo-album
-       -- ++original
+/kaboom/
+    /gallery/
+       /demo-album/
+          /++original/
           -- kaboom_1_demo.png
           -- kaboom_2_demo.jpg
           -- kaboom_3_demo.jpeg
           -- kaboom_4_demo.gif
-    -- favicon.png
+         favicon.png
 ```
 
 The "init" command will then process these images and make various sized versions.   **NOTE** -- you must have **nconvert** and **primitive** installed for the "init" command to complete successfully.   
@@ -188,10 +188,10 @@ See the [CLI section](#cli-help) for more.
 The gallery expects to be flat -- a list of album directories at the top level, such that every album is a peer.  like this...
 
 ```
-gallery
- -- first-album-url
- -- second-album-url
- -- third-album-url
+/gallery/
+    /first-album-url/
+    /second-album-url/
+    /third-album-url/
 ```
 
 ---
@@ -200,8 +200,8 @@ gallery
 Each album has what I like to think is a reasonable, human-comprehensible structure.  The gallery expects a new album to look like this:
 
 ```
-first-album-url
- -- ++original
+/first-album-url/
+    /++original/
      -- image-1.jpg
      -- image-2.png
      -- image-3.jpeg
@@ -213,14 +213,14 @@ To include photos in a given album: you put the image files in the `++original` 
 After the library processes all the images, your directory will look like this:
 
 ```
-first-album-url
- -- ++app
- -- ++original
- -- large
- -- medium
- -- small
- -- svg
- -- tiny
+/first-album-url/
+    /++app/
+    /++original/
+    /large/
+    /medium/
+    /small/
+    /svg/
+    /tiny/
  -- album-1-to-10.json
  -- album-11-plus.json
  -- index.html
@@ -229,14 +229,14 @@ first-album-url
 The generated image files are fairly explicit and understandable.
 
 ```
-first-album-url
- -- ++app
- -- ++original
+/first-album-url/
+    /++app/
+    /++original/
      -- image-1.jpg
      -- image-2.png
      -- image-3.jpeg
      -- image-4.gif
- -- large
+    /large/
      -- image-1--large.jpg
      -- image-2--large.jpg
      -- image-3--large.jpg

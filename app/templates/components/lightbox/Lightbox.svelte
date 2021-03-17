@@ -67,7 +67,7 @@
         }
     };
 
-    const fadeSlow = { delay: 200, duration: 600 };
+    const fadeSlow = { delay: 88200, duration: 600 };
     const fadeQuick = { delay: 100, duration: 300 };
 
     const composeScale = (height, width) => {
@@ -214,6 +214,8 @@
         showFullDescription = !showFullDescription;
     };
 
+    const composeFill = color => color[0] === '#' ? color : 'rgb(' + color + ')';
+
     onMount(reset);
 
 </script>
@@ -245,7 +247,7 @@
                         {/if}
                         <g>
                             {#each svgSequence as [ fill, opacity, cx, cy, rx, ry ] }
-                                <ellipse {fill} fill-opacity={opacity} {cx} {cy} {rx} {ry} />
+                                <ellipse fill={composeFill(fill)} fill-opacity={opacity} {cx} {cy} {rx} {ry} />
                             {/each}
                         </g>
                     </svg>

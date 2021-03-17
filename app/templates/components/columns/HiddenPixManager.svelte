@@ -1,7 +1,7 @@
 <script>
     import GalleryStore from '../../store/store';
     import UXStore from '../../store/ux-store';
-    import GalleryItem from '../gallery/GalleryItem.svelte';
+    import GalleryItem from '../gallery-items/GalleryItem.svelte';
     import { getDocWidth } from '../../utility/dom';
 
     const flipDurationMs = 200;

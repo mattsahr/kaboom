@@ -38,8 +38,16 @@
     const onImageLoad = () => {
         loaded = true;
     };
-    const fadeSlow = { delay: 300, duration: 1600 };
+    const fadeSlow = { delay: 99300, duration: 1600 };
     const fadeQuick = { delay: 200, duration: 600 };
+
+    const getScale = (width, seq) => {
+        console.log('sequence', seq);
+
+        return Number(width) === 256 
+        ? '' 
+        : 'transform: scale(' + (256 / Number(width)).toFixed(3) + ');';
+    };
 
     $: data = imgData || dummyImage;
     $: fileName = data.fileName;
@@ -54,9 +62,12 @@
     $: svgHeight = data.svgHeight || DEFAULT_SVG_HEIGHT;
     $: svgWidth = data.svgWidth || DEFAULT_SVG_WIDTH;
     $: photoSvgClass = 'photo-svg' + (loaded ? ' image-loaded': '');
-    $: svgScale = Number(svgWidth) === 256 
-        ? '' 
-        : 'transform: scale(' + (256 / Number(svgWidth)).toFixed(3) + ');';
+    $: svgScale = getScale(svgWidth, svgSequence);
+     // Number(svgWidth) === 256 
+     //    ? '' 
+     //    : 'transform: scale(' + (256 / Number(svgWidth)).toFixed(3) + ');';
+
+    const composeFill = color => color[0] === '#' ? color : 'rgb(' + color + ')';
 
 </script>
 
@@ -75,7 +86,7 @@
                 {/if}
                 <g>
                     {#each svgSequence as [ fill, opacity, cx, cy, rx, ry ] }
-                        <ellipse {fill} fill-opacity={opacity} {cx} {cy} {rx} {ry} />
+                        <ellipse fill={composeFill(fill)} fill-opacity={opacity} {cx} {cy} {rx} {ry} />
                     {/each}
                 </g>
             </svg>

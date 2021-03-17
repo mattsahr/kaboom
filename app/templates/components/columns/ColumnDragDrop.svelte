@@ -7,7 +7,7 @@
     import { getDocWidth } from '../../utility/dom';
     import GalleryStore from '../../store/store';
     import UXStore from '../../store/ux-store';
-    import GalleryItem from '../gallery/GalleryItem.svelte';
+    import GalleryItem from '../gallery-items/GalleryItem.svelte';
     import MdShuffle from 'svelte-icons/md/MdShuffle.svelte';
     import HiddenPixManager from './HiddenPixManager.svelte';
     import MdClose from 'svelte-icons/md/MdClose.svelte';

@@ -1,6 +1,6 @@
 <script>
     import GalleryStore from '../../store/store';
-    import GalleryItemBasic from '../gallery/GalleryItemBasic.svelte';
+    import GalleryItemBasic from '../gallery-items/GalleryItemBasic.svelte';
     import { GALLERY_IS_HOME_PAGE } from '../../utility/constants';
 
     $: isHomePage = Boolean($GalleryStore[GALLERY_IS_HOME_PAGE]);

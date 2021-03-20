@@ -19,7 +19,22 @@ const hydrateNavData = galleryData => {
 
 const hydrateSvgSequence = (() => {
     const dummySequence = ['#ef5c08,0.945,133,110,220,161'];
-    const explode = str => str.split(',');
+    const explode = str => {
+        if (str[0] === '#') { return str.split(','); }
+
+        console.log('str', str);
+
+        const [color, location] = str.split('|');
+
+        console.log('color', color);
+        console.log('LOCATION', location);
+
+        const sequence = location.split(',');
+        sequence.unshift('0.4');
+        sequence.unshift('#' + color);
+
+        return sequence;
+    };
     return seq => (seq || dummySequence).map(explode);
 })(); 
 

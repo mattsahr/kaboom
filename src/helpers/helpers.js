@@ -1,5 +1,19 @@
 const fs = require( 'fs' );
 
+const versionTest = (successCallback) => {
+    const nodeVersion = Number(process.versions.node.split('.').shift());
+
+    if (nodeVersion < 12) {
+        console.log('--------');
+        console.log('Your version of node:', process.versions.node);
+        console.log('Version 12 or higher required.');
+        console.log('--------');
+        process.exit(1);
+    }
+
+    if (successCallback) { successCallback(); }
+};
+
 const checkFile = path => {
     try {
         if (fs.existsSync(path)) {
@@ -134,6 +148,7 @@ module.exports = {
     copyFile,
     next,
     replaceLastOrAdd,
+    versionTest,
     waitParallel,
     waitSerial
 };

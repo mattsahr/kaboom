@@ -6,13 +6,9 @@ const {
 } = require('./help-file.js');
 const buildDirectories = require('./build-directories/build-directories.js');
 const processActiveImages = require('./ingest-resize/ingest-resize.js');
-const {
-    checkStructure,
-    checkStructureInit 
-} = require ('./helpers/check-structure.js');
-const { waitSerial } = require('./helpers/helpers.js');
+const { checkStructure, checkStructureInit  } = require ('./helpers/check-structure.js');
+const { versionTest, waitSerial } = require('./helpers/helpers.js');
 const deployCompare = require('./deploy/deploy-compare.js');
-// const hydrateJSON = require ('./hydrate/hydrate-json.js');
 const addAlbum = require ('./add-album/add-album.js');
 const hydrateApp = require('./hydrate/hydrate-app.js');
 const hydrateNavJSON = require('./hydrate/hydrate-nav-json');
@@ -20,7 +16,7 @@ const serve = require('./serve/serve.js');
 const init = require('./helpers/init.js');
 
 
-const test = () => { 
+const testSuccess = () => { 
     console.log( '-------- TEST CALLBACK >>> Finished! ---------'); 
     process.exit(0);
 };
@@ -69,6 +65,7 @@ const cli = args => {
 
         case 'init': {
             waitSerial({
+                versionTest,
                 init,
                 checkStructureInit,
                 buildDirectories,
@@ -79,6 +76,7 @@ const cli = args => {
 
         case 'ingest':
             waitSerial({
+                versionTest,
                 checkStructure,
                 thenProcessImages:  processActiveImages(option, exitCallback, option)
             });
@@ -97,7 +95,8 @@ const cli = args => {
             break;
 
         case 'test':
-            init();
+            versionTest(testSuccess);
+            // init();
             // hydrateJSON('./gallery-active/africa-ethiopia', test);
             break;
 

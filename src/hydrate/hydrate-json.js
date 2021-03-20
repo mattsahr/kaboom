@@ -1,147 +1,109 @@
 const fs = require( 'fs' );
 const path = require( 'path' );
-const Jimp = require('jimp');
 const saveMeta = require('./save-meta.js');
 const getMeta = require('./get-meta.js');
-const { DEFAULT_IMAGE_DIRECTORY } = require('../constants.js');
-const { replaceLastOrAdd } = require('../helpers/helpers.js');
+const printHeaderNotes = require('./hydrate-json.notes');
+const { DEFAULT_IMAGE_DIRECTORY, SVG_CONSTANTS } = require('../constants.js');
+const { spawn, Pool, Worker }  = require('threads');
 
-const endBracket = /\/>/g;
-const endG = /<\/g>/g;
-const endSVG = /<\/svg>/g;
-
-const svgToData = data => {
-    const sequence = [];
-    const circles = data.split('<ellipse ');
-
-    const frontMatter = circles.shift();
-    let dimensions = frontMatter.split('width="')[1];
-    dimensions = dimensions.split('" height="');
-    const width = dimensions[0];
-    const height = dimensions[1].split('">')[0];
-    // console.log('---- width', width, ' height', height);
-
-    for (const next of circles) {
-        const prepped = next
-            .replace(endBracket, '')
-            .replace(endG, '')
-            .replace(endSVG, '')
-            .replace('fill=', '')
-            .replace(' fill-opacity=', ', ')
-            .replace(' cx=', ', ')
-            .replace(' cy=', ', ')
-            .replace(' rx=', ', ')
-            .replace(' ry=', ', ');
-
-        const nextData = JSON.parse('[' + prepped + ']');
-        nextData[1] = Number(nextData[1]).toFixed(3);
-        sequence.push(nextData.join(','));
-    }
-    return { height, width, sequence };
+const goodImage ={
+    '.jpg': true, 
+    '.jpeg': true, 
+    '.png': true, 
+    '.gif': true
 };
-
 
 const removeOrphanJSON = (albumMeta, originals) => {
     const imageFound = originals => item => originals.includes(item.fileName);
     albumMeta.images = albumMeta.images.filter(imageFound(originals));
 };
 
-const hydrateJSON = async (albumDirectory, successCallback) => {
+const getImageMeta = (fileName, albumMeta) => {
+
+    let currentMeta = albumMeta.images.find(next => next.fileName === fileName);
+
+    if (!currentMeta) {
+        currentMeta = {
+            fileName,
+            title: fileName,
+            description: ''
+        };
+        albumMeta.images.push(currentMeta);
+    }
+
+    return currentMeta;
+};
+
+const hydrateJSON = async (albumName, albumDirectory, successCallback) => {
 
     const albumMeta = await getMeta(albumDirectory);
+    const pool = SVG_CONSTANTS && SVG_CONSTANTS.CPU_THREADS
+        ? Pool(
+            () => spawn(new Worker('../ingest-resize/worker-build-svg.js')), 
+            SVG_CONSTANTS.CPU_THREADS
+          )
+        : Pool(() => spawn(new Worker('../ingest-resize/worker-build-svg.js')));
 
     albumMeta.title = albumMeta.title || albumDirectory.split(path.sep).pop();
 
-    const imageDirectory = path.join(albumDirectory, 'svg');
+    // const imageDirectory = path.join(albumDirectory, 'svg');
     const originalDirectory = path.join(albumDirectory, DEFAULT_IMAGE_DIRECTORY);
-    const imageNames = await fs.promises.readdir(imageDirectory);
-    const total = imageNames.length;
-    let count = 0;
+    const imageNames = await fs.promises.readdir(originalDirectory);
 
     const confirmedOriginals = [];
 
     for (const fileName of imageNames) {
-        // Get the full paths
-        const fromPath = path.join(imageDirectory, fileName);
-        const stat = await fs.promises.stat(fromPath);
+        const fromPath = path.join(originalDirectory, fileName);
 
-        if( stat.isFile() ) {
-            count++;
-
-            const svgData = await fs.promises.readFile(fromPath, 'utf8');
-            const { height, width, sequence } = svgToData(svgData);
-            console.log(albumDirectory, fileName, 
-                'svgSequence [' + count + '] of ' + total + ' | size:', 
-                JSON.stringify(sequence).length
-            );
-
-            const imgTypes = [ 'jpg', 'jpeg', 'png', 'gif' ];
-
-            let baseFileName;
-            let original;
-            let imgFound = false;
-
-            while (!imgFound) {
-                try {
-                    baseFileName = replaceLastOrAdd(fileName, 'svg', imgTypes.shift());
-                    original = await Jimp.read(path.join(originalDirectory, baseFileName));
-                    imgFound = true;
-                    confirmedOriginals.push(baseFileName);
-                } catch (e) {
-                    if (!imgTypes.length) {
-                        console.error(albumDirectory, 'NO IMAGE FOUND', baseFileName);
-                        baseFileName = false;
-                        imgFound = true;
-                        // process.exit(1);
-                    }
-                }
+        try {
+            const stat = await fs.promises.stat(fromPath);
+            if( stat.isFile() && goodImage[path.extname(fileName)] ) {
+                confirmedOriginals.push(fileName);
             }
-
-            if (baseFileName) {
-
-                const currentMeta = albumMeta.images.find(next => next.fileName === baseFileName);
-
-                if (currentMeta) {
-                    // currentMeta.id = baseFileName;
-
-                    currentMeta.width = original.bitmap.width;
-                    currentMeta.height = original.bitmap.height;
-
-                    // currentMeta.svgSequence = sequence;
-                    currentMeta.svgHeight = height;
-                    currentMeta.svgWidth = width;
-
-                    albumMeta.svgSequences[baseFileName] = sequence;
-
-                } else {
-                    const nextImage = {
-                        // id: baseFileName,
-                        fileName: baseFileName,
-
-                        width: original.bitmap.width,
-                        height: original.bitmap.height,
-
-                        title: baseFileName,
-                        description: '',
-                        // svgSequence: sequence,
-                        svgHeight: height,
-                        svgWidth: width
-                    };
-                    albumMeta.svgSequences[baseFileName] = sequence;
-                    albumMeta.images.push(nextImage);
-                }
-
-            }
-
-        } else {
-            count++;
-        }
-
-        if (count >= total) {
-            removeOrphanJSON(albumMeta, confirmedOriginals);
-            saveMeta(albumMeta, albumDirectory, successCallback);
+        } catch (err) {
+            console.log('/src/hydrate/hydrate-json.js  image file error');
+            console.log('FILENAME:',  fileName);
+            console.log(err);
         }
     }
+
+    let count = 0;
+    printHeaderNotes();
+    const svgTasks = [];
+
+    const addTask = (fileName, sourcePath, albumMeta) => {
+        const task = pool.queue(worker => 
+            worker.build(sourcePath)
+        );
+
+        task.then(({ originalHeight, originalWidth, height, width, sequence }) => {
+            const imageMeta = getImageMeta(fileName, albumMeta);
+
+            imageMeta.height = originalHeight;
+            imageMeta.width = originalWidth;
+            imageMeta.svgHeight = height;
+            imageMeta.svgWidth = width;
+
+            albumMeta.svgSequences[fileName] = sequence;
+
+            count++;
+            console.log('SVG: [' + count + '] of ' + confirmedOriginals.length + ' | ' + fileName);
+            console.log(' ');
+        });
+
+        svgTasks.push(task);
+    };
+
+    for (const fileName of confirmedOriginals) {
+        const sourcePath = path.join(originalDirectory, fileName);
+        addTask(fileName, sourcePath, albumMeta);
+    }
+
+    await Promise.all(svgTasks);
+    await pool.terminate(true);
+
+    removeOrphanJSON(albumMeta, confirmedOriginals);
+    saveMeta(albumMeta, albumDirectory, successCallback);
 
 };
 

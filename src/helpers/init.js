@@ -29,6 +29,7 @@ const init = async successCallback => {
         constants.DUMMY_RESOURCE_PATH = path.join(current, 'src', 'dummy');
         constants.REMOTE_URLS_JSON = path.join(current, 'src', 'remote-urls.json');
         constants.GALLERY_MAIN_PATH = path.join(current, 'gallery');    
+        constants.PROCESS_DIRECTORY = path.join(current, 'src');
 
         const fileString = 'module.exports = ' + JSON.stringify(constants, null, 4) + ';\n';
         const constantsPath = path.join('src', 'constants.js');

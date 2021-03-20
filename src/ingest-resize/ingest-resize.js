@@ -1,21 +1,22 @@
 const fs = require('fs');
 const path = require( 'path' );
-const { copyFile, replaceLastOrAdd } = require('../helpers/helpers.js');
-const nConvert = require('./n-convert.js');
-const primitive = require('./primitive.js');
+const { replaceLastOrAdd } = require('../helpers/helpers.js');
 const hydrateJSON = require('../hydrate/hydrate-json.js');
 const getDirectoryName = require('./get-input-directory.js');
 const { logIntro } = require('./ingest-resize-info.js');
 const {
     APP_LOCAL_DIRECTORY,
     DEFAULT_IMAGE_DIRECTORY,
-    GALLERY_MAIN_PATH
+    GALLERY_MAIN_PATH,
+    SVG_CONSTANTS
 } = require('../constants.js');
+const { spawn, Pool, Worker }  = require('threads');
+
+let pool;
 
 const notAppDir = dir => dir !== APP_LOCAL_DIRECTORY;
 
 const TRANSFORM_SIZES = {
-    // microscopic: 'microscopic',
     tiny: 'tiny',
     small: 'small',
     medium: 'medium',
@@ -23,23 +24,12 @@ const TRANSFORM_SIZES = {
     svg: 'svg' // included to make sure "svg" directory is built
 };
 
-const transform = (size, source, destination, handleResults) => {
 
-    const handleCopyResults = err => {
-        if (err) {
-            console.log('Copy File: error');
-            console.log(err);
-        } else {
-            nConvert(size, destination, handleResults);
-        }
-    };
-
-    copyFile(source, destination, handleCopyResults);
-};
-
-const batchTransform = async (size, remoteDir, successCallback) => {
+const batchTransform = async (size, albumName, remoteDir, successCallback) => {
 
     if (size === 'svg') { successCallback(size); return; }
+
+    const transformTasks = [];
 
     if (!TRANSFORM_SIZES[size]) {
         console.error('No handler for size: ' + size);
@@ -51,8 +41,8 @@ const batchTransform = async (size, remoteDir, successCallback) => {
     const sourceImages = await fs.promises.readdir(sourcePath);
 
     let totalToProcess = 0;
-    const successes = [];
 
+    /*
     const handleTransformResults = destination => {
         successes.push(destination);
 
@@ -61,12 +51,13 @@ const batchTransform = async (size, remoteDir, successCallback) => {
             (successes.length < 10 ? ('0' + successes.length) : successes.length) +
              ' ] of ' + 
             totalToProcess + ':  ' 
-            + destination);
+            + albumName);
 
         if (successes.length >= totalToProcess) {
             if (successCallback) { successCallback(size); }
         }
     };
+    */
 
     console.log(' ');
     console.log('---- Resize images: [ ' + size + ' ] ----');
@@ -76,6 +67,14 @@ const batchTransform = async (size, remoteDir, successCallback) => {
         '.jpg': true,
         '.jpeg': true,
         '.gif': true
+    };
+
+    const addTask = (size, fromPath, destinationPath) => {
+        const task = pool.queue(worker => 
+            worker.resizeAndSave(size, fromPath, destinationPath)
+        );
+
+        transformTasks.push(task);
     };
 
     for(const imagePath of sourceImages) {
@@ -91,100 +90,58 @@ const batchTransform = async (size, remoteDir, successCallback) => {
                 const sizedFile = replaceLastOrAdd(imagePath, imgExtension, '--' + size + '.jpg');
 
                 const destinationPath = path.join(remoteDir, destination, sizedFile);
-                transform(size, fromPath, destinationPath, handleTransformResults);
+                // resizeAndSave(size, fromPath, destinationPath, handleTransformResults);
 
-            }
-        }
-    }
-};
-
-const buildSVG = async (albumPath, successCallback) => {
-    const sourcePath = path.join(albumPath, DEFAULT_IMAGE_DIRECTORY);
-
-    console.log('BUILD SVG', sourcePath);
-    console.log('Be patient... SVG creation can take a while.');
-    console.log(' ');
-
-    const sourceImages = await fs.promises.readdir(sourcePath);
-
-    const toProcess = [];
-    let total = 0;
-    let finished = 0;
-
-    const goodTypes = {
-        '.png': true,
-        '.jpg': true,
-        '.jpeg': true,
-        '.gif': true
-    };
-
-    const handleConversionResults = (destination) => {
-        if (destination) {
-            finished++;
-            console.log(
-                'SVG [ ' + finished + ' ] of ' + total + ':  ' + destination
-            );
-        }
-
-        if (toProcess.length) {
-            const imagePath = toProcess.shift();
-            const fromPath = path.join(sourcePath, imagePath);
-
-            const imgExtension = path.extname(fromPath);
-
-            const svgFile = replaceLastOrAdd(imagePath, imgExtension, '.svg');
-            const destinationPath = path.join(albumPath, 'svg', svgFile);
-
-            primitive(fromPath, destinationPath, handleConversionResults);
-        } else {
-            console.log(albumPath, ' ');
-            console.log(albumPath, '-- all SVG images complete');
-            successCallback(albumPath);
-        }
-    };    
-
-    for(const imagePath of sourceImages) {
-        const fromPath = path.join(sourcePath, imagePath);
-        const stat = await fs.promises.stat(fromPath);
-
-        if(stat.isFile()) {
-            const imgType = path.extname(fromPath);
-            if (goodTypes[imgType]) {
-                toProcess.push(imagePath);
-                total++;
+                addTask(size, fromPath, destinationPath);
+                // handleTransformResults(destinationPath);
             }
         }
     }
 
-    handleConversionResults();
+    await Promise.all(transformTasks);
+
+    console.log('Images Processed:', totalToProcess);
+
+    successCallback();
 };
 
-const albumTransform = async (albumPath, successCallback) => {
+const albumTransform = async (albumName, albumPath, successCallback) => {
+
+    const pool = SVG_CONSTANTS && SVG_CONSTANTS.CPU_THREADS
+        ? Pool(
+            () => spawn(new Worker('worker-resize-and-save.js')), 
+            SVG_CONSTANTS.CPU_THREADS
+          )
+        : Pool(() => spawn(new Worker('worker-resize-and-save.js')));
+
+
 
     const sizes = Object.values(TRANSFORM_SIZES);
     let svgBuildCalled = false;
 
-    const transformNext = (priorSize) => {
+    const transformNext = async (priorSize) => {
         if (priorSize && priorSize !== 'svg') {
-            console.log(albumPath, priorSize, 'conversions complete');
+            console.log(albumName, priorSize, 'conversions complete');
         }
 
         if (sizes.length) {
             const next = sizes.shift();
-            batchTransform(next, albumPath, transformNext);
+            batchTransform(next, albumName, albumPath, transformNext);
 
         } else {
             if (!svgBuildCalled) {
                 svgBuildCalled = true;
+                await pool.terminate(true);
 
                 console.log(' ');
-                console.log(albumPath, 'ALL CONVERSIONS COMPLETE');
+                console.log(albumName, 'ALL CONVERSIONS COMPLETE');
                 console.log(' ');
 
-                buildSVG(albumPath, successCallback);      
+                successCallback(albumName, albumPath); // call to hydrateJSON(albumPath)
             }
         }
     };
+
 
     transformNext();
 
@@ -247,7 +204,7 @@ const processActiveImages = (() => {
         return true;
     };
 
-    const surveyAlbum = async (albumPath, successCallback, finalCallback) => {
+    const surveyAlbum = async (albumName, albumPath, successCallback, finalCallback) => {
 
         const topItems = await fs.promises.readdir(albumPath);
         const originalPath = path.join(albumPath, DEFAULT_IMAGE_DIRECTORY);
@@ -275,33 +232,14 @@ const processActiveImages = (() => {
         }
 
         if (successCallback) { 
-            successCallback(albumPath, finalCallback);
+            successCallback(albumName, albumPath, finalCallback);
         }
     };
 
-
-
     const buildAlbumConversionSuccess = (allAlbums, successCallback) => {  
-
-        /*
-        const finished = [];
-
-        const jsonSuccess = (albumPath) => {
-            finished.push(albumPath);
-            if (finished.length >= allAlbums.length) {
-                console.log(' ');
-                // hydrateNavJSON();
-                if (successCallback) { successCallback(); }
-            }
+        return (albumName, albumPath) => {
+            hydrateJSON(albumName, albumPath, successCallback);
         };
-        */
-
-        return albumPath => {
-            console.log(' ');
-            console.log('---- ' + albumPath + ' --- Collect all metadata in a json file ----');
-            hydrateJSON(albumPath, successCallback);
-        };
-
     };
 
     return (albumArgument, successCallback, skipNameInput) => async () => {
@@ -340,7 +278,7 @@ const processActiveImages = (() => {
         }
 
         const surveyNext = albumPath => {
-            surveyAlbum(albumPath, albumTransform, conversionSuccess);
+            surveyAlbum(albumName, albumPath, albumTransform, conversionSuccess);
         };
 
         const proceed = () => {

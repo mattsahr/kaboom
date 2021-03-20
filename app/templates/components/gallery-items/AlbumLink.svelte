@@ -39,9 +39,10 @@
         font-weight: bold;
         color: rgb(120, 140, 160);
         display: flex;
+        align-items: center;
+        justify-content: space-between;
         padding: 8px 8px 8px 12px;
         margin: 0;
-        align-items: center;
         border-radius: 4px;
         cursor: pointer;
     }
@@ -52,8 +53,8 @@
     }
 
     .icon {
-        height: 18px;
-        width: 19px;
+        height: 22px;
+        width: 40px;
         padding: 0 0 0 8px;
     }
 

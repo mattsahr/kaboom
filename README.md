@@ -3,9 +3,8 @@ A small, fast, static site photo gallery.  Written in node.js and Svelte.
 [Demo Gallery](https://mattsahr.github.io/kaboom-demo/kaboom-how-to/)
 
 **TLDR INSTALL**  
-install [Node](https://nodejs.org/)  
-install [Primitive](https://github.com/fogleman/primitive)  
-install [NConvert](https://www.xnview.com/en/nconvert/)  
+Install [Node](https://nodejs.org/)  
+or make sure your node version is 12 or greater `node --version`
 
 ```
 git clone https://github.com/mattsahr/kaboom.git
@@ -56,7 +55,7 @@ The "large" version of any given image only loads when a user opens the lightbox
 ---
 
 **Good Place Holders**  
-The gallery aims to make good-looking inline placeholder images by using Michael Fogleman's amazing [Primitive](https://github.com/fogleman/primitive) library.  The placeholder images are rendered as simplified geometric mosaics, like this one. 
+The gallery aims to make good-looking inline placeholder images by using methods from Michael Fogleman's amazing [Primitive](https://github.com/fogleman/primitive) library (extended in [C++](https://github.com/Tw1ddle/geometrize) or [Haxe](https://github.com/Tw1ddle/geometrize-haxe), or of course [Javascript](https://github.com/cancerberoSgx/geometrizejs)).  The placeholder images are rendered as simplified geometric mosaics, like this one. 
 
 <div style="width: 100%; display:flex; justify-content: center">
 
@@ -64,7 +63,7 @@ The gallery aims to make good-looking inline placeholder images by using Michael
 
 </div>
 
-Place-holders are svg, made of 100 overlapping ovals.  Data for each place-holder amounts to about 3k of uncompressed json.  The [Primitive](https://github.com/fogleman/primitive) library has many other options besides ovals, but I found that ovals look pretty good on a broad array of images, and they are VERY easy to compress.
+Place-holders are svg, made of 100 overlapping ovals.  Data for each place-holder amounts to about 3k of uncompressed json.  The [GeometrizeJS](https://github.com/cancerberoSgx/geometrizejs/tree/master/geometrizejs) library has many other options besides ovals, but I found that ovals look pretty good on a broad array of images, and they are very terse, compressible in JSON format.
 
 ---
 
@@ -101,15 +100,13 @@ I had a lot more stuff about designing static site generators.  But it's fairly 
 
 <h3 id="installation">INSTALLATION</h3>
 
-In addition to node.js and npm, you will need to install two external libraries.
+Install [Node](https://nodejs.org/)   
+Or Make sure your node version is 12 or greater 
 
-**Primitive**  
-[https://github.com/fogleman/primitive](https://github.com/fogleman/primitive)  
-
-**NConvert**  
-[https://www.xnview.com/en/nconvert/](https://www.xnview.com/en/nconvert/)
-
-Both Primitive and NConvert are available for Windows, Mac, Linux.
+```
+node --version
+```
+If you need to update your node version: [some options](https://stackoverflow.com/questions/10075990/upgrading-node-js-to-latest-version#10076029).
 
 **Installing kaboom**  
 ```
@@ -118,6 +115,7 @@ cd kaboom
 npm install
 npm link
 ```
+**NOTE** on mac/linux you likely need `sudo npm link` for the last step. 
 
 Once you have kaboom installed and linked, you should be able to type this at the command line
 

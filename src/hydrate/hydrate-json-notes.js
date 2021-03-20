@@ -1,0 +1,23 @@
+module.exports = (albumName) => {
+    console.log('-------------------------------------------------------------------');
+    console.log(' ');
+    console.log('    ' + albumName);
+    console.log('--------------------------------------------------------------------');
+    console.log('Collecting all metadata in a json file...');
+    console.log('--------------------------------------------------------------------');
+    console.log(' ');
+    console.log('Creating SVG place-holder images...');
+    console.log('BE PATIENT -- this part takes a while.');
+    console.log(' ');
+    console.log('If it takes too long -- consider editing the control');
+    console.log('variables in this file:  /kaboom/src/constants.js');
+    console.log(' ');
+    console.log('When you set "SVG_SHAPE_CANDIDATES" and "SVG_SHAPE_MUTATIONS" to');
+    console.log('smaller values, it will make less accurate place-holders images,');
+    console.log('but will work quicker.');
+    console.log(' ');
+    console.log('Also, if your machine can handle heavier loads,');
+    console.log('consider increasing the "CPU_THREADS" count in the same file.');
+    console.log('--------------------------------------------------------------------');
+    console.log(' ');
+};

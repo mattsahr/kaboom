@@ -67,7 +67,7 @@
         }
     };
 
-    const fadeSlow = { delay: 88200, duration: 600 };
+    const fadeSlow = { delay: 200, duration: 600 };
     const fadeQuick = { delay: 100, duration: 300 };
 
     const composeScale = (height, width) => {

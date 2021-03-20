@@ -38,16 +38,12 @@
     const onImageLoad = () => {
         loaded = true;
     };
-    const fadeSlow = { delay: 99300, duration: 1600 };
+    const fadeSlow = { delay: 300, duration: 600 };
     const fadeQuick = { delay: 200, duration: 600 };
 
-    const getScale = (width, seq) => {
-        console.log('sequence', seq);
-
-        return Number(width) === 256 
+    const getScale = width => Number(width) === 256 
         ? '' 
         : 'transform: scale(' + (256 / Number(width)).toFixed(3) + ');';
-    };
 
     $: data = imgData || dummyImage;
     $: fileName = data.fileName;
@@ -62,7 +58,7 @@
     $: svgHeight = data.svgHeight || DEFAULT_SVG_HEIGHT;
     $: svgWidth = data.svgWidth || DEFAULT_SVG_WIDTH;
     $: photoSvgClass = 'photo-svg' + (loaded ? ' image-loaded': '');
-    $: svgScale = getScale(svgWidth, svgSequence);
+    $: svgScale = getScale(svgWidth);
      // Number(svgWidth) === 256 
      //    ? '' 
      //    : 'transform: scale(' + (256 / Number(svgWidth)).toFixed(3) + ');';

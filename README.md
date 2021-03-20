@@ -451,6 +451,18 @@ npm run dev
 
 This should start a server at `localhost:5000` that hot loads the svelte code.
 
+The directory /kaboom/app/pages/ starts out as just a skeleton.  It needs some image directories added to get fully on its feet.  Copy these directories from /gallery/demo-album/ into /app/pages/
+
+```
+/demo-album/
+   /small/
+   /medium/
+   /large/
+   /tiny/
+```
+
+After copying the image folders, your dev server should load the page completely.
+
 The `npm run dev` is good for developing.  When you're happy with your changes,  
 run `npm run build` to bundle the app for wider use.
 

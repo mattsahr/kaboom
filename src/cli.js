@@ -69,7 +69,7 @@ const cli = args => {
                 init,
                 checkStructureInit,
                 buildDirectories,
-                processDemo: processActiveImages('demo-album',exitCallback, 'skipNameInput')
+                processDemo: processActiveImages('demo-album', exitCallback, 'skipNameInput')
             });
             break;
         }

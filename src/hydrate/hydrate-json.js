@@ -2,7 +2,7 @@ const fs = require( 'fs' );
 const path = require( 'path' );
 const saveMeta = require('./save-meta.js');
 const getMeta = require('./get-meta.js');
-const printHeaderNotes = require('./hydrate-json.notes');
+const printHeaderNotes = require('./hydrate-json-notes.js');
 const { DEFAULT_IMAGE_DIRECTORY, SVG_CONSTANTS } = require('../constants.js');
 const { spawn, Pool, Worker }  = require('threads');
 

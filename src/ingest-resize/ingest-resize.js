@@ -107,14 +107,12 @@ const batchTransform = async (size, albumName, remoteDir, successCallback) => {
 
 const albumTransform = async (albumName, albumPath, successCallback) => {
 
-    const pool = SVG_CONSTANTS && SVG_CONSTANTS.CPU_THREADS
+    pool = SVG_CONSTANTS && SVG_CONSTANTS.CPU_THREADS
         ? Pool(
             () => spawn(new Worker('worker-resize-and-save.js')), 
             SVG_CONSTANTS.CPU_THREADS
           )
         : Pool(() => spawn(new Worker('worker-resize-and-save.js')));
-
-
 
     const sizes = Object.values(TRANSFORM_SIZES);
     let svgBuildCalled = false;
@@ -244,7 +242,9 @@ const processActiveImages = (() => {
 
     return (albumArgument, successCallback, skipNameInput) => async () => {
 
-        logIntro();
+        if (!skipNameInput) {
+            logIntro();
+        }
 
         const albumName = skipNameInput 
             ? albumArgument

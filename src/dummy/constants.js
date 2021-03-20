@@ -18,7 +18,7 @@ module.exports = {
         ],
         SVG_SHAPE_CANDIDATES: 2048, 
         SVG_SHAPE_MUTATIONS: 2048,
-        CPU_THREADS: 3
+        CPU_THREADS: 4
     },
 
     DEMO_PIX: [

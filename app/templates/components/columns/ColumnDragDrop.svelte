@@ -124,14 +124,14 @@
 {/if}
 
 <div class={boardClass}>
-    {#each imageBatches as column(column.columnId)}
+    {#each imageBatches as column (column.columnId)}
         {#if column.items && column.items.length}
             <div class="gallery-list" 
                 use:dndzone={{items: column.items, flipDurationMs, dragDisabled: mode !== 'arrange'}}
                 on:consider={(e) => handleDndFinalize(column.columnId, e)} 
                 on:finalize={(e) => handleDndFinalize(column.columnId, e)}>
 
-                {#each column.items as imgData(imgData.fileName)}
+                {#each column.items as imgData(imgData.id)}
                     <div class="drag-animator"  animate:flip="{{duration: flipDurationMs}}">
                         <GalleryItem {imgData} {mode} {hideItem} {deleteItem} unhideItem={false}
                             isHomePage={isHomePage}

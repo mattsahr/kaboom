@@ -31,7 +31,6 @@
 
         // console.log('columns', columns, '  columnSize', columnSize, '  Batch!', batch);
 
-        console.log('batch', batch);
         return batch;
     };
 

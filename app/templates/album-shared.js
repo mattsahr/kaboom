@@ -1,4 +1,5 @@
 import GalleryStore from './store/store';
+import { hydrateSvgSequence } from './store/store';
 import { GALLERY_IS_HOME_PAGE } from './utility/constants';
 
 const hydrateNavData = galleryData => {
@@ -10,33 +11,15 @@ const hydrateNavData = galleryData => {
         window.NAV_DATA[GALLERY_IS_HOME_PAGE] = true;
     }
 
+    /*
     console.group('hydrateNavData');
     console.log('location path', window.location.pathname.split('/').filter(next => next).pop());
     console.log('NAV_DATA', window.NAV_DATA);
     console.log('galleryData', galleryData);
     console.groupEnd();
+    */
+
 };
-
-const hydrateSvgSequence = (() => {
-    const dummySequence = ['#ef5c08,0.945,133,110,220,161'];
-    const explode = str => {
-        if (str[0] === '#') { return str.split(','); }
-
-        console.log('str', str);
-
-        const [color, location] = str.split('|');
-
-        console.log('color', color);
-        console.log('LOCATION', location);
-
-        const sequence = location.split(',');
-        sequence.unshift('0.4');
-        sequence.unshift('#' + color);
-
-        return sequence;
-    };
-    return seq => (seq || dummySequence).map(explode);
-})(); 
 
 const hydrateAlbum = album => {
     const { images, svgSequences } = album;
@@ -81,9 +64,11 @@ const composeStartup = App => albumData => {
         return;
     }
 
+    /*
     console.group('composeStartup');
     console.log('albumData', albumData);
     console.groupEnd();
+    */
 
     hydrateTitle(albumData);
     hydrateAlbum(albumData);

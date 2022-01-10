@@ -15,7 +15,7 @@ const hydrateSharedData = navData => {
         }
     }
 
-    console.log('hydrateSharedData', navData);
+    // console.log('hydrateSharedData', navData);
 
     window.NAV_DATA = window.NAV_DATA || {};
     window.NAV_DATA.categories = categories;
@@ -39,7 +39,7 @@ const NavApp = navData => {
         }
     }
 
-    console.log('navData!', navData);
+    // console.log('navData!', navData);
 
     NavStore.set(navData);
     hydrateSharedData(navData);

@@ -1,6 +1,22 @@
 import _cloneDeep from 'lodash/cloneDeep';
 import { writable } from 'svelte/store';
 
+export const hydrateSvgSequence = (() => {
+    const dummySequence = ['#ef5c08,0.945,133,110,220,161'];
+    const explode = str => {
+        if (str[0] === '#') { return str.split(','); }
+
+        const [color, xyRxRy] = str.split('|');
+        const oval = xyRxRy.split(',');
+        oval.unshift('0.4');
+        oval.unshift('#' + color);
+
+        return oval;
+    };
+    return seq => (seq || dummySequence).map(explode);
+})(); 
+
+
 const createGalleryStore = () => {
     const { subscribe, set, update } = writable ({
         title: 'ALBUM',
@@ -39,12 +55,6 @@ const createGalleryStore = () => {
     };
 
     const getAllImages = () => _cloneDeep(GALLERY.images);
-
-    const hydrateSvgSequence = (() => {
-        const dummySequence = ['#ef5c08,0.945,133,110,220,161'];
-        const explode = str => str.split(',');
-        return seq => (seq || dummySequence).map(explode);
-    })(); 
 
     const addImages = extraGallery => {
         const updated = _cloneDeep(GALLERY);

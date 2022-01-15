@@ -1,45 +1,7 @@
-const path = require( 'path' );
-const fs = require( 'fs' );
 const { copyFile } = require ('./helpers.js');
-const constantsSOURCE = require ('../dummy/constants.js');
-
+const { updateConstants } = require ('./update-constants.js');
 
 const init = async successCallback => {
-
-    const updateConstants = async () => {
-
-        const constants = {...constantsSOURCE };
-
-        delete constants.DUMMY;
-        constants.PATHS_INITIALIZED = true;
-
-        const dateOptions = {
-            weekday: 'short',
-            year: 'numeric',
-            month: 'short',
-            day: '2-digit'
-        };
-
-        constants.INIT_STATUS = "UPDATED VIA 'kaboom init' -- " + 
-            new Date().toLocaleDateString("en-US", dateOptions);
-
-        const current = process.cwd();
-
-        constants.APP_DIRECTORY = path.join(current, 'app', 'pages');
-        constants.DUMMY_RESOURCE_PATH = path.join(current, 'src', 'dummy');
-        constants.REMOTE_URLS_JSON = path.join(current, 'src', 'remote-urls.json');
-        constants.GALLERY_MAIN_PATH = path.join(current, 'gallery');    
-        constants.PROCESS_DIRECTORY = path.join(current, 'src');
-
-        const fileString = 'module.exports = ' + JSON.stringify(constants, null, 4) + ';\n';
-        const constantsPath = path.join('src', 'constants.js');
-        await fs.promises.writeFile(constantsPath, fileString);
-
-        if (successCallback) {
-            successCallback();
-        }
-    };
-
 
     const copyFinal = copyError => {
         if (copyError) {
@@ -51,7 +13,7 @@ const init = async successCallback => {
             process.exit(1);
         }
 
-        updateConstants();
+        updateConstants(successCallback);
     };
 
     const toCopy = [

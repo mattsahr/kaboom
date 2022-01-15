@@ -28,5 +28,6 @@ app/pages/++app/album-app.js.map
 ### Gallery Data
 gallery-actual/
 gallery/
+mini-gallery/
 src/remote-urls.json
 src/site-config.json

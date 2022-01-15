@@ -4,6 +4,7 @@
     import { GALLERY_IS_HOME_PAGE } from '../../utility/constants';
 
     $: isHomePage = Boolean($GalleryStore[GALLERY_IS_HOME_PAGE]);
+    $: visiblePix = $GalleryStore.images.filter(image => !image.hidden);
 
 </script>
 
@@ -12,7 +13,7 @@
 
 <div class="column-board">
     <div class="gallery-list">
-        {#each $GalleryStore.images as imgData(imgData.fileName)}
+        {#each visiblePix as imgData(imgData.fileName)}
             <GalleryItemBasic {imgData} {isHomePage} 
                 viewLightbox={GalleryStore.viewLightbox} />
         {/each}

@@ -68,7 +68,7 @@ const hydrateJSON = async (albumName, albumDirectory, successCallback) => {
     }
 
     let count = 0;
-    printHeaderNotes();
+    printHeaderNotes(albumName);
     const svgTasks = [];
 
     const addTask = (fileName, sourcePath, albumMeta) => {

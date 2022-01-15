@@ -8,6 +8,7 @@ const shortHelp = [
 ' kaboom help [command]    help for [command]',
 '',
 ' kaboom init              Make a /gallery/ directory and put a /demo-album/ inside',
+' kaboom paths             Reset paths if you saved over /src/constants.js (developers)',
 '',
 ' kaboom serve             Run a web server on localhost:4444',
 ' kaboom serve static      Run a web server on localhost:4444, static version',
@@ -64,6 +65,24 @@ init: [
 '  the equivalent of "kaboom ingest" on',
 '  the /demo-album/ directory, which processes',
 '  all demo-album images for use in the app.'
+],
+
+
+paths: [
+'',
+'',
+'',
+'kaboom paths',
+'________________________________',
+'  The file /src/constants.js should not be saved or updated to github.',
+'  So if you develop, and update a branch, take care to leave this file out.',
+'',
+'  Often this means that /src/constants.js gets reset to project defaults',
+'  in which case, the program will forget the paths where stuff is located.',
+'',
+'  Running "kaboom paths" will reset all the path names in /src/constants.js',
+'  IMPORTANT NOTE -- ONLY RUN THIS COMMAND FROM THE /kaboom DIRECTORY.',
+''
 ],
 
 serve: [
@@ -176,6 +195,7 @@ spacer: [
 helpFile.default = [].concat(
     helpFile.intro,
     helpFile.init,
+    helpFile.paths,
     helpFile.serve,
     helpFile.add,
     helpFile.ingest,

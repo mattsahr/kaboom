@@ -59,7 +59,7 @@ The gallery aims to make good-looking inline placeholder images by using methods
 
 <div style="width: 100%; display:flex; justify-content: center">
 
-![Demo Primitive](./src/dummy/demo.svg)
+![Demo Primitive](https://raw.githubusercontent.com/mattsahr/kaboom/master/src/dummy/demo.svg)
 
 </div>
 
